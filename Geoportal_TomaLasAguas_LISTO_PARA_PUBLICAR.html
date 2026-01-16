@@ -1,0 +1,3051 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geoportal de Toma las Aguas</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+
+        /* Header con logo */
+        .header {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1002;
+            background: white;
+            padding: 12px 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .header-logo {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .header-title h1 {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1f2937;
+            margin: 0;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .header-title h1:hover {
+            color: #667eea;
+        }
+
+        /* Botones minimizar/maximizar */
+        .toggle-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            width: 30px;
+            height: 30px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            transition: all 0.3s;
+            z-index: 10;
+        }
+
+        .toggle-btn:hover {
+            background: #2563eb;
+            transform: scale(1.1);
+        }
+
+        .panel-minimized {
+            width: 50px !important;
+            height: 50px !important;
+            overflow: hidden !important;
+            padding: 10px !important;
+        }
+
+        .panel-minimized > *:not(.toggle-btn) {
+            display: none !important;
+        }
+
+        .control-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            max-width: 320px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            z-index: 1000;
+        }
+
+        .control-panel h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #2c5282;
+            border-bottom: 2px solid #4299e1;
+            padding-bottom: 8px;
+        }
+
+        .control-panel h3 {
+            font-size: 13px;
+            margin: 15px 0 8px 0;
+            color: #4a5568;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .layer-control {
+            margin: 6px 0;
+            display: flex;
+            align-items: center;
+            padding: 6px 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+
+        .layer-control:hover {
+            background-color: #f7fafc;
+        }
+
+        .layer-control input[type="checkbox"] {
+            margin-right: 10px;
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+        }
+
+        .layer-control label {
+            cursor: pointer;
+            flex: 1;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+        }
+
+        .layer-count {
+            margin-left: auto;
+            font-size: 10px;
+            background: #edf2f7;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: 600;
+        }
+
+        .layer-count.loaded {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .color-indicator {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            margin-right: 8px;
+            border: 1px solid #ccc;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .loading-overlay.hidden {
+            display: none;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4299e1;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .success-badge {
+            display: inline-block;
+            background: #48bb78;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-left: 5px;
+        }
+
+        .toggle-all {
+            background: #4299e1;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            margin: 10px 0;
+            width: 100%;
+        }
+
+        .toggle-all:hover {
+            background: #3182ce;
+        }
+
+        /* Custom Leaflet popup styles */
+        .leaflet-popup-content-wrapper {
+            border-radius: 8px;
+            padding: 0;
+        }
+
+        .leaflet-popup-content {
+            margin: 0;
+            min-width: 250px;
+        }
+
+        .custom-popup {
+            padding: 15px;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        .custom-popup h3 {
+            margin: 0 0 12px 0;
+            font-size: 16px;
+            text-transform: none;
+            letter-spacing: normal;
+        }
+
+        .custom-popup-divider {
+            border-top: 2px solid;
+            padding-top: 10px;
+            margin-top: 10px;
+        }
+
+        .custom-popup p {
+            margin: 8px 0;
+            color: #374151;
+            font-size: 13px;
+        }
+
+        .custom-popup strong {
+            color: #1f2937;
+        }
+
+        /* ========== ESTILOS PARA MODAL DE BIENVENIDA ========== */
+        .welcome-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            opacity: 1;
+            transition: opacity 0.5s ease;
+        }
+
+        .welcome-modal.closing {
+            animation: slideToHeader 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+        }
+
+        @keyframes slideToHeader {
+            0% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+            100% {
+                opacity: 0;
+                transform: scale(0.1) translateY(-90vh);
+            }
+        }
+
+        .welcome-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px;
+            border-radius: 20px;
+            max-width: 700px;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+            color: white;
+            position: relative;
+            transform: scale(1);
+            transition: transform 0.5s ease;
+        }
+
+        .welcome-modal.closing .welcome-content {
+            transform: scale(0.8);
+        }
+
+        .welcome-logo {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: block;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            border: 3px solid rgba(255,255,255,0.5);
+        }
+
+        .welcome-header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid rgba(255,255,255,0.3);
+            padding-bottom: 20px;
+        }
+
+        .welcome-header h2 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .welcome-header .subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+            font-style: italic;
+        }
+
+        .welcome-icon {
+            font-size: 60px;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .welcome-section {
+            margin-bottom: 25px;
+            line-height: 1.8;
+        }
+
+        .welcome-section h3 {
+            font-size: 20px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .welcome-section p {
+            font-size: 15px;
+            margin-bottom: 10px;
+            text-align: justify;
+        }
+
+        .highlight-box {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 4px solid #fbbf24;
+        }
+
+        .highlight-box strong {
+            color: #fbbf24;
+        }
+
+        .alert-box {
+            background: rgba(239, 68, 68, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 4px solid #ef4444;
+        }
+
+        .features-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .features-list li {
+            padding: 8px 0;
+            padding-left: 30px;
+            position: relative;
+        }
+
+        .features-list li:before {
+            content: "💧";
+            position: absolute;
+            left: 0;
+        }
+
+        .close-welcome-btn {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: block;
+            margin: 30px auto 0;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+        }
+
+        .close-welcome-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+            background: #fbbf24;
+            color: white;
+        }
+
+        /* Scrollbar personalizado para modal */
+        .welcome-content::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        .welcome-content::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+        }
+
+        .welcome-content::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+        }
+
+        .welcome-content::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        /* ========== MEJORA PARA PANELES ARRASTRABLES ========== */
+        .header {
+            transition: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        .panel-minimized {
+            cursor: move !important;
+            user-select: none;
+        }
+
+        .panel-minimized.dragging {
+            opacity: 0.8;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.4) !important;
+        }
+
+        .control-panel, .legends-panel {
+            transition: box-shadow 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <!-- ========== MODAL DE BIENVENIDA ========== -->
+    <div id="welcome-modal" class="welcome-modal">
+        <div class="welcome-content">
+            <img src="data:image/webp;base64,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" 
+             alt="Toma las Aguas" class="welcome-logo">
+            <span class="welcome-icon">🌊💧🏝️</span>
+            
+            <div class="welcome-header">
+                <h2>Bienvenido al Geoportal Toma las Aguas</h2>
+                <p class="subtitle">Transparencia y Participación Ciudadana para la Seguridad Hídrica de Puerto Morelos</p>
+            </div>
+
+            <div class="welcome-section">
+                <h3>🗺️ ¿Por qué este geoportal?</h3>
+                <p>Puerto Morelos se encuentra en una de las zonas más vulnerables hidrológicamente de la Península de Yucatán. Este territorio descansa sobre un <strong>acuífero kárstico</strong>, un sistema geológico extraordinariamente frágil donde el agua se filtra directamente a través de roca caliza porosa hacia nuestro único reservorio de agua dulce.</p>
+            </div>
+
+            <div class="alert-box">
+                <h3>⚠️ Crisis de Seguridad Hídrica</h3>
+                <p>El acelerado desarrollo inmobiliario está generando una <strong>crisis sin precedentes</strong>:</p>
+                <ul class="features-list">
+                    <li>Sobreexplotación del acuífero mediante extracción masiva</li>
+                    <li>Contaminación directa por lixiviados y aguas residuales mal tratadas</li>
+                    <li>Destrucción de cenotes y sistemas de infiltración natural</li>
+                    <li>Pérdida irreversible de selva que regula el ciclo hidrológico</li>
+                    <li>Intrusión salina por extracción excesiva en zona costera</li>
+                </ul>
+            </div>
+
+            <div class="welcome-section">
+                <h3>🔬 Fragilidad del Sistema Kárstico</h3>
+                <p>A diferencia de otros acuíferos, el sistema kárstico de Quintana Roo <strong>no filtra contaminantes</strong>. Las fracturas, cavernas y ríos subterráneos permiten que cualquier contaminante llegue directamente al agua que consumimos. Una vez contaminado, <strong>la remediación es prácticamente imposible</strong>.</p>
+            </div>
+
+            <div class="alert-box">
+                <h3>🏭 Extracción de Agua y Consecuencias Regionales</h3>
+                <p>Los sistemas de extracción de agua en Puerto Morelos no solo abastecen a nuestra población local, sino que también proveen agua a <strong>Cancún y su Aeropuerto Internacional</strong>. Esta extracción masiva genera:</p>
+                <ul class="features-list">
+                    <li><strong>Presión adicional sobre el acuífero</strong> que excede su capacidad de recarga natural</li>
+                    <li><strong>Riesgo elevado de intrusión salina</strong> en la zona costera por el descenso del nivel freático</li>
+                    <li><strong>Impacto desproporcionado</strong> en nuestro territorio mientras otros municipios se benefician del recurso</li>
+                </ul>
+            </div>
+
+            <div class="highlight-box">
+                <h3>🗺️ La Fractura Holbox-Xel-Há y Nuestra Reserva Estratégica</h3>
+                <p>Puerto Morelos se encuentra sobre la <strong>Fractura Holbox-Xel-Há</strong>, una línea geológica de más de 300 kilómetros que divide el estado de Quintana Roo en dos y pasa directamente por Leona Vicario. Esta fractura es más que una característica geológica:</p>
+                <ul class="features-list">
+                    <li>Representa la <strong>reserva de agua más importante del norte de Quintana Roo</strong></li>
+                    <li>Es un corredor hidrogeológico fundamental que alimenta los sistemas de recarga del acuífero</li>
+                    <li><strong>Provee agua a más de 1.5 millones de habitantes</strong> de la zona turística más importante de México</li>
+                    <li>Constituye la <strong>mayor capacidad de almacenamiento de agua</strong> del noreste peninsular</li>
+                    <li>Su protección es <strong>estratégica para la seguridad hídrica</strong> de toda la Riviera Maya</li>
+                </ul>
+                <p style="margin-top: 15px;"><strong>Por esta razón, Puerto Morelos debe ser reconocido como un municipio proveedor de agua</strong>, con normativas especiales de protección ambiental, ordenamiento territorial estricto y compensaciones por los servicios ecosistémicos que brinda a la región.</p>
+            </div>
+
+            <div class="highlight-box">
+                <h3>💡 La Información es Poder</h3>
+                <p><strong>Este geoportal democratiza el acceso a información geoespacial crítica</strong> que tradicionalmente ha estado dispersa o inaccesible para la ciudadanía. Integramos datos sobre:</p>
+                <ul class="features-list">
+                    <li>Desarrollos inmobiliarios y su impacto territorial</li>
+                    <li>Zonas de karstificación y vulnerabilidad acuífera</li>
+                    <li>Cenotes, lagunas y cuerpos de agua amenazados</li>
+                    <li>Fallas geológicas y riesgo sísmico</li>
+                    <li>Áreas naturales protegidas y su cumplimiento</li>
+                    <li>Análisis socioeconómico del territorio</li>
+                </ul>
+            </div>
+
+            <div class="welcome-section">
+                <h3>👥 Participación Ciudadana</h3>
+                <p>Al <strong>registrarte e iniciar sesión</strong>, podrás:</p>
+                <ul class="features-list">
+                    <li>Reportar nuevos desarrollos inmobiliarios que detectes</li>
+                    <li>Documentar irregularidades ambientales</li>
+                    <li>Verificar si existe Manifestación de Impacto Ambiental (MIA)</li>
+                    <li>Contribuir a un mapeo colaborativo del territorio</li>
+                    <li>Acceder a análisis espaciales actualizados</li>
+                </ul>
+            </div>
+
+            <div class="welcome-section">
+                <h3>🎯 Nuestro Objetivo</h3>
+                <p>Hacer <strong>pública, dinámica y colaborativa</strong> la información sobre el estado de nuestro territorio. Solo con transparencia y participación ciudadana informada podremos:</p>
+                <ul class="features-list">
+                    <li>Exigir cumplimiento de normativas ambientales</li>
+                    <li>Presionar por un desarrollo territorial sostenible</li>
+                    <li>Proteger nuestro acuífero para generaciones futuras</li>
+                    <li>Construir resiliencia hídrica comunitaria</li>
+                </ul>
+            </div>
+
+            <div class="highlight-box">
+                <p style="text-align: center; font-size: 16px;"><strong>El agua es vida. El territorio es comunidad. La información es poder.</strong></p>
+            </div>
+
+            <button class="close-welcome-btn" onclick="closeWelcome()">
+                🚀 Comenzar a Explorar el Geoportal
+            </button>
+        </div>
+    </div>
+
+    <!-- Header con logo -->
+    <div class="header">
+        <img src="data:image/webp;base64,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" 
+             alt="Toma las Aguas" class="header-logo">
+        <div class="header-title">
+            <h1 onclick="openWelcome()">Geoportal de Toma las Aguas</h1>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <div class="loading-overlay" id="loading">
+        <div style="text-align: center; background: white; padding: 30px; border-radius: 8px;">
+            <div class="spinner"></div>
+            <h3 style="color: #2c5282; margin-bottom: 10px;">Cargando Geoportal</h3>
+            <p id="loading-text" style="color: #718096; font-size: 14px;">Iniciando...</p>
+        </div>
+    </div>
+
+    <div class="control-panel" id="control-panel">
+        <button class="toggle-btn" onclick="togglePanel('control-panel')" title="Minimizar/Maximizar">
+            <span id="control-toggle-icon">−</span>
+        </button>
+        <h2>🛰️ Geoportal <span class="success-badge">SATELITAL</span></h2>
+
+        <button class="toggle-all" onclick="toggleAllLayers()">✓ Activar/Desactivar Todas</button>
+        
+        <h3>🏗️ Desarrollo Urbano</h3>
+        <div class="layer-control">
+            <input type="checkbox" id="layer-proyectos" checked>
+            <label for="layer-proyectos">
+                <span class="color-indicator" style="background-color: #e53e3e;"></span>
+                Proyectos Inmobiliarios-turísticos
+            </label>
+            <span class="layer-count" id="count-proyectos">0</span>
+        </div>
+
+        <div class="layer-control">
+            <input type="checkbox" id="layer-proyectos-colab" checked>
+            <label for="layer-proyectos-colab">
+                <span class="color-indicator" style="background-color: #9333ea;"></span>
+                Proyectos Colaborativos
+            </label>
+            <span class="layer-count" id="count-proyectos-colab">0</span>
+        </div>
+        
+        <div id="add-project-section" style="margin: 10px 0; padding: 10px; background: #f7fafc; border-radius: 4px; display: none;">
+            <button id="add-project-btn" style="width: 100%; padding: 8px; background: #9333ea; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">
+                ➕ Agregar Proyecto
+            </button>
+            <p style="font-size: 10px; color: #6b7280; margin: 5px 0 0 0; text-align: center;">Haz click en el mapa o ingresa coordenadas</p>
+        </div>
+        
+        <div id="login-section" style="margin: 10px 0; padding: 10px; background: #fef3c7; border-radius: 4px; border: 1px solid #fbbf24;">
+            <p style="font-size: 11px; color: #78350f; margin: 0 0 8px 0; font-weight: 600;">Inicia sesión para colaborar</p>
+            <button id="show-login-btn" style="width: 100%; padding: 8px; background: #f59e0b; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; margin-bottom: 5px;">
+                🔐 Iniciar Sesión
+            </button>
+            <button id="show-register-btn" style="width: 100%; padding: 8px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">
+                📝 Registrarse
+            </button>
+        </div>
+        
+        <div id="user-section" style="margin: 10px 0; padding: 10px; background: #d1fae5; border-radius: 4px; border: 1px solid #10b981; display: none;">
+            <p style="font-size: 11px; color: #065f46; margin: 0 0 5px 0;">
+                👤 <strong id="username-display"></strong>
+            </p>
+            <button id="logout-btn" style="width: 100%; padding: 6px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                Cerrar Sesión
+            </button>
+        </div>
+
+        <h3>💧 Agua</h3>
+        <div class="layer-control">
+            <input type="checkbox" id="layer-descargas" checked>
+            <label for="layer-descargas">
+                <span class="color-indicator" style="background: linear-gradient(90deg, #7dd3fc, #0369a1);"></span>
+                Descargas 2023
+            </label>
+            <span class="layer-count" id="count-descargas">0</span>
+        </div>
+        <div class="layer-control">
+            <input type="checkbox" id="layer-extracciones" checked>
+            <label for="layer-extracciones">
+                <span class="color-indicator" style="background: linear-gradient(90deg, #fb923c, #ea580c);"></span>
+                Extracciones 2023
+            </label>
+            <span class="layer-count" id="count-extracciones">0</span>
+        </div>
+
+        <h3>🌊 Cuerpos de Agua (IAHCSA)</h3>
+        <div class="layer-control">
+            <input type="checkbox" id="layer-cuerpos-agua" checked>
+            <label for="layer-cuerpos-agua">
+                <span class="color-indicator" style="background: linear-gradient(135deg, #3b82f6, #10b981);"></span>
+                Todos los Cuerpos de Agua
+            </label>
+            <span class="layer-count" id="count-cuerpos-agua">0</span>
+        </div>
+        <div id="cuerpos-agua-summary" style="padding: 8px 8px 8px 28px; font-size: 11px; color: #4a5568; background: #f7fafc; border-radius: 4px; margin: 5px 0 10px 0;">
+            <strong>Total:</strong> <span id="total-area-cuerpos">0</span> m²
+        </div>
+        <div class="layer-control" style="padding-left: 20px;">
+            <input type="checkbox" id="layer-piscinas" checked>
+            <label for="layer-piscinas">
+                <span class="color-indicator" style="background-color: #ec4899;"></span>
+                Piscinas
+            </label>
+            <span class="layer-count" id="count-piscinas">0</span>
+        </div>
+        <div style="padding-left: 40px; font-size: 10px; color: #6b7280; margin-bottom: 3px;" id="area-piscinas"></div>
+        
+        <div class="layer-control" style="padding-left: 20px;">
+            <input type="checkbox" id="layer-cenotes-sup" checked>
+            <label for="layer-cenotes-sup">
+                <span class="color-indicator" style="background-color: #10b981;"></span>
+                Cenotes Modificados
+            </label>
+            <span class="layer-count" id="count-cenotes-sup">0</span>
+        </div>
+        <div style="padding-left: 40px; font-size: 10px; color: #6b7280; margin-bottom: 3px;" id="area-cenotes-sup"></div>
+        
+        <div class="layer-control" style="padding-left: 20px;">
+            <input type="checkbox" id="layer-cenotes-sub" checked>
+            <label for="layer-cenotes-sub">
+                <span class="color-indicator" style="background-color: #ef4444;"></span>
+                Cenotes Artificiales
+            </label>
+            <span class="layer-count" id="count-cenotes-sub">0</span>
+        </div>
+        <div style="padding-left: 40px; font-size: 10px; color: #6b7280; margin-bottom: 3px;" id="area-cenotes-sub"></div>
+        
+        <div class="layer-control" style="padding-left: 20px;">
+            <input type="checkbox" id="layer-aguadas-art" checked>
+            <label for="layer-aguadas-art">
+                <span class="color-indicator" style="background-color: #3b82f6;"></span>
+                Aguadas Antropizadas
+            </label>
+            <span class="layer-count" id="count-aguadas-art">0</span>
+        </div>
+        <div style="padding-left: 40px; font-size: 10px; color: #6b7280; margin-bottom: 3px;" id="area-aguadas-art"></div>
+        
+        <div class="layer-control" style="padding-left: 20px;">
+            <input type="checkbox" id="layer-aguadas-nat" checked>
+            <label for="layer-aguadas-nat">
+                <span class="color-indicator" style="background-color: #8b5cf6;"></span>
+                Aguadas Naturales
+            </label>
+            <span class="layer-count" id="count-aguadas-nat">0</span>
+        </div>
+        <div style="padding-left: 40px; font-size: 10px; color: #6b7280; margin-bottom: 3px;" id="area-aguadas-nat"></div>
+        
+        <div class="layer-control" style="padding-left: 20px;">
+            <input type="checkbox" id="layer-sascab" checked>
+            <label for="layer-sascab">
+                <span class="color-indicator" style="background-color: #f59e0b;"></span>
+                Sascaberas
+            </label>
+            <span class="layer-count" id="count-sascab">0</span>
+        </div>
+        <div style="padding-left: 40px; font-size: 10px; color: #6b7280; margin-bottom: 3px;" id="area-sascab"></div>
+        
+        <div class="layer-control" style="padding-left: 20px;">
+            <input type="checkbox" id="layer-rios" checked>
+            <label for="layer-rios">
+                <span class="color-indicator" style="background-color: #06b6d4;"></span>
+                Ríos Artificiales
+            </label>
+            <span class="layer-count" id="count-rios">0</span>
+        </div>
+        <div style="padding-left: 40px; font-size: 10px; color: #6b7280; margin-bottom: 3px;" id="area-rios"></div>
+
+        <h3>🌊 Geología e Hidrología</h3>
+        <div class="layer-control">
+            <input type="checkbox" id="layer-karstificacion" checked>
+            <label for="layer-karstificacion">
+                <span class="color-indicator" style="background: linear-gradient(90deg, #fef3c7, #78350f);"></span>
+                Karstificación
+            </label>
+            <span class="layer-count" id="count-karstificacion">0</span>
+        </div>
+        <div class="layer-control">
+            <input type="checkbox" id="layer-fallas-inegi" checked>
+            <label for="layer-fallas-inegi">
+                <span class="color-indicator" style="background-color: #9f7aea;"></span>
+                Fallas INEGI
+            </label>
+            <span class="layer-count" id="count-fallas-inegi">0</span>
+        </div>
+        <div class="layer-control">
+            <input type="checkbox" id="layer-fallas-cenapred" checked>
+            <label for="layer-fallas-cenapred">
+                <span class="color-indicator" style="background-color: #ed64a6;"></span>
+                Fallas CENAPRED
+            </label>
+            <span class="layer-count" id="count-fallas-cenapred">0</span>
+        </div>
+
+        <h3>🏞️ Ordenamiento</h3>
+        <div class="layer-control">
+            <input type="checkbox" id="layer-poel" checked>
+            <label for="layer-poel">
+                <span class="color-indicator" style="background: linear-gradient(135deg, #0ea5e9, #1e3a8a);"></span>
+                POEL 2013
+            </label>
+            <span class="layer-count" id="count-poel">0</span>
+        </div>
+        <div class="layer-control">
+            <input type="checkbox" id="layer-socioeco" checked>
+            <label for="layer-socioeco">
+                <span class="color-indicator" style="background: linear-gradient(135deg, #38b2ac, #4299e1);"></span>
+                Socioecosistema
+            </label>
+            <span class="layer-count" id="count-socioeco">0</span>
+        </div>
+        <div class="layer-control">
+            <input type="checkbox" id="layer-municipio" checked>
+            <label for="layer-municipio">
+                <span class="color-indicator" style="background-color: rgba(74, 85, 104, 0.3); border: 2px solid #4a5568;"></span>
+                Límite Municipal
+            </label>
+            <span class="layer-count" id="count-municipio">0</span>
+        </div>
+    </div>
+
+    <!-- Panel de Leyendas -->
+    <div id="legends-panel" style="position: absolute; bottom: 20px; right: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); max-width: 300px; z-index: 1000; font-size: 11px;">
+        <button class="toggle-btn" onclick="togglePanel('legends-panel')" title="Minimizar/Maximizar" style="top: 8px; right: 8px;">
+            <span id="legends-toggle-icon">−</span>
+        </button>
+        <h3 style="font-size: 14px; margin: 0 0 10px 0; color: #2c5282; border-bottom: 2px solid #4299e1; padding-bottom: 5px;">Leyendas</h3>
+        
+        <div style="margin-bottom: 12px;">
+            <strong style="font-size: 11px; color: #4a5568;">Volumen de Agua (hm³/año)</strong>
+            <div style="margin-top: 5px;">
+                <div style="font-size: 10px; font-weight: 600; color: #0369a1; margin-bottom: 2px;">Descargas</div>
+                <div style="height: 12px; background: linear-gradient(90deg, #7dd3fc, #0369a1); border-radius: 3px; margin-bottom: 3px;"></div>
+                <div style="display: flex; justify-content: space-between; font-size: 9px; color: #6b7280;">
+                    <span>Bajo</span><span>Alto</span>
+                </div>
+            </div>
+            <div style="margin-top: 8px;">
+                <div style="font-size: 10px; font-weight: 600; color: #ea580c; margin-bottom: 2px;">Extracciones</div>
+                <div style="height: 12px; background: linear-gradient(90deg, #fb923c, #ea580c); border-radius: 3px; margin-bottom: 3px;"></div>
+                <div style="display: flex; justify-content: space-between; font-size: 9px; color: #6b7280;">
+                    <span>Bajo</span><span>Alto</span>
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+            <strong style="font-size: 11px; color: #4a5568;">Intensidad de Karstificación (medio a muy alto)</strong>
+            <div style="height: 12px; background: linear-gradient(90deg, #fef3c7, #78350f); border-radius: 3px; margin: 5px 0 3px 0;"></div>
+            <div style="display: flex; justify-content: space-between; font-size: 9px; color: #6b7280;">
+                <span>Medio</span><span>Muy Alto</span>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 12px;" id="legend-poel-section">
+            <strong style="font-size: 11px; color: #4a5568;">POEL 2013 - UGAs por Política</strong>
+            <div id="legend-poel-items" style="margin-top: 5px; max-height: 200px; overflow-y: auto;"></div>
+        </div>
+
+        <div>
+            <strong style="font-size: 11px; color: #4a5568;">Cuerpos de Agua (IAHCSA)</strong>
+            <div style="margin-top: 5px; font-size: 10px;">
+                <div style="display: flex; align-items: center; margin: 3px 0;">
+                    <div style="width: 12px; height: 12px; background: #ec4899; border-radius: 2px; margin-right: 6px;"></div>
+                    <span>Piscinas</span>
+                </div>
+                <div style="display: flex; align-items: center; margin: 3px 0;">
+                    <div style="width: 12px; height: 12px; background: #10b981; border-radius: 2px; margin-right: 6px;"></div>
+                    <span>Cenotes Modificados</span>
+                </div>
+                <div style="display: flex; align-items: center; margin: 3px 0;">
+                    <div style="width: 12px; height: 12px; background: #ef4444; border-radius: 2px; margin-right: 6px;"></div>
+                    <span>Cenotes Artificiales</span>
+                </div>
+                <div style="display: flex; align-items: center; margin: 3px 0;">
+                    <div style="width: 12px; height: 12px; background: #3b82f6; border-radius: 2px; margin-right: 6px;"></div>
+                    <span>Aguadas Antropizadas</span>
+                </div>
+                <div style="display: flex; align-items: center; margin: 3px 0;">
+                    <div style="width: 12px; height: 12px; background: #8b5cf6; border-radius: 2px; margin-right: 6px;"></div>
+                    <span>Aguadas Naturales</span>
+                </div>
+                <div style="display: flex; align-items: center; margin: 3px 0;">
+                    <div style="width: 12px; height: 12px; background: #f59e0b; border-radius: 2px; margin-right: 6px;"></div>
+                    <span>Sascaberas</span>
+                </div>
+                <div style="display: flex; align-items: center; margin: 3px 0;">
+                    <div style="width: 12px; height: 12px; background: #06b6d4; border-radius: 2px; margin-right: 6px;"></div>
+                    <span>Ríos Artificiales</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Login -->
+    <div id="login-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 30px; border-radius: 12px; max-width: 400px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+            <h2 style="margin: 0 0 20px 0; color: #1f2937;">🔐 Iniciar Sesión</h2>
+            <form id="login-form">
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568;">Email</label>
+                    <input type="email" id="login-email" required style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568;">Contraseña</label>
+                    <input type="password" id="login-password" required style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                </div>
+                <div id="login-error" style="display: none; padding: 10px; background: #fee; border: 1px solid #f88; border-radius: 6px; margin-bottom: 15px; color: #c00; font-size: 13px;"></div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" style="flex: 1; padding: 12px; background: #f59e0b; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;">
+                        Entrar
+                    </button>
+                    <button type="button" id="close-login-modal" style="flex: 1; padding: 12px; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Registro -->
+    <div id="register-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 30px; border-radius: 12px; max-width: 400px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+            <h2 style="margin: 0 0 20px 0; color: #1f2937;">📝 Registrarse</h2>
+            <form id="register-form">
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568;">Nombre de Usuario</label>
+                    <input type="text" id="register-username" required style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568;">Email</label>
+                    <input type="email" id="register-email" required style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568;">Contraseña (mínimo 6 caracteres)</label>
+                    <input type="password" id="register-password" required minlength="6" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                </div>
+                <div id="register-error" style="display: none; padding: 10px; background: #fee; border: 1px solid #f88; border-radius: 6px; margin-bottom: 15px; color: #c00; font-size: 13px;"></div>
+                <div id="register-success" style="display: none; padding: 10px; background: #d1fae5; border: 1px solid #10b981; border-radius: 6px; margin-bottom: 15px; color: #065f46; font-size: 13px;"></div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" style="flex: 1; padding: 12px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;">
+                        Crear Cuenta
+                    </button>
+                    <button type="button" id="close-register-modal" style="flex: 1; padding: 12px; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Agregar Proyecto -->
+    <div id="add-project-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 30px; border-radius: 12px; max-width: 500px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-height: 90vh; overflow-y: auto;">
+            <h2 style="margin: 0 0 20px 0; color: #1f2937;">➕ Agregar Proyecto Inmobiliario-turístico</h2>
+            <form id="add-project-form">
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568;">Nombre del Proyecto *</label>
+                    <input type="text" id="project-nombre" required style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568;">Descripción</label>
+                    <textarea id="project-descripcion" rows="3" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; resize: vertical;"></textarea>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568;">MIA</label>
+                    <input type="text" id="project-mia" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568;">¿Ilegalidad o irregularidad?</label>
+                    <input type="text" id="project-irregularidad" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568;">Latitud *</label>
+                        <input type="number" id="project-lat" required step="0.000001" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568;">Longitud *</label>
+                        <input type="number" id="project-lng" required step="0.000001" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                    </div>
+                </div>
+                <div style="padding: 12px; background: #eff6ff; border: 1px solid #3b82f6; border-radius: 6px; margin-bottom: 15px;">
+                    <p style="margin: 0; font-size: 12px; color: #1e40af;">
+                        💡 <strong>Tip:</strong> Haz click en el mapa para capturar las coordenadas automáticamente
+                    </p>
+                    <button type="button" id="enable-map-click" style="margin-top: 8px; width: 100%; padding: 8px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
+                        📍 Activar Click en Mapa
+                    </button>
+                </div>
+                <div id="add-project-error" style="display: none; padding: 10px; background: #fee; border: 1px solid #f88; border-radius: 6px; margin-bottom: 15px; color: #c00; font-size: 13px;"></div>
+                <div id="add-project-success" style="display: none; padding: 10px; background: #d1fae5; border: 1px solid #10b981; border-radius: 6px; margin-bottom: 15px; color: #065f46; font-size: 13px;"></div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" style="flex: 1; padding: 12px; background: #9333ea; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;">
+                        💾 Guardar Proyecto
+                    </button>
+                    <button type="button" id="close-add-project-modal" style="flex: 1; padding: 12px; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
+    
+    <script>
+        console.log('=== GEOPORTAL PUERTO MORELOS - VISTA SATELITAL ===');
+
+        const SUPABASE_URL = 'https://mrniyxyurgbpfqfuzgws.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ybml5eHl1cmdicGZxZnV6Z3dzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MTI1OTgsImV4cCI6MjA4MDk4ODU5OH0.tkZIuDNUreGSqLL0JvuzJepZEfducQ3L5N4BS7Jxv4M';
+
+        // Variables globales (se inicializarán cuando las librerías estén cargadas)
+        let map;
+        let layerGroups;
+        let supabaseClient;
+
+        const COLORS = {
+            proyectos: '#e53e3e',
+            proyectosColab: '#9333ea',
+            cuerposAgua: {
+                'piscina': '#ec4899',
+                'cenote_s_a': '#10b981',
+                'cenote_s_s': '#ef4444',
+                'aguada_a': '#3b82f6',
+                'aguada_n': '#8b5cf6',
+                'sascab_ce': '#f59e0b',
+                'rio_a': '#06b6d4',
+                'default': '#6b7280'
+            },
+            poel: {
+                'Protección': '#1e3a8a',
+                'Conservación': '#0369a1',
+                'Preservación': '#0284c7',
+                'Aprovechamiento Sustentable': '#eab308',
+                'Restauración': '#f97316',
+                'default': '#a0aec0'
+            },
+            socioeco: {
+                'Manglar': '#38b2ac',
+                'Selva': '#2f855a',
+                'Urbano': '#e53e3e',
+                'Agrícola': '#d69e2e',
+                'Costero': '#4299e1',
+                'default': '#718096'
+            },
+            fallasINEGI: '#9f7aea',
+            fallasCENAPRED: '#ed64a6',
+            municipio: '#4a5568'
+        };
+
+        // ========== FUNCIONES PARA MODAL DE BIENVENIDA ==========
+        function openWelcome() {
+            const modal = document.getElementById('welcome-modal');
+            modal.classList.remove('closing');
+            modal.style.display = 'flex';
+        }
+
+        function closeWelcome() {
+            const modal = document.getElementById('welcome-modal');
+            modal.classList.add('closing');
+            
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 800);
+        }
+
+        // ========== FUNCIONES PARA ARRASTRE DE PANELES MINIMIZADOS ==========
+        let isDragging = false;
+        let currentPanel = null;
+        let offsetX = 0;
+        let offsetY = 0;
+
+        function setupDraggable() {
+            const panels = document.querySelectorAll('.control-panel, .legends-panel');
+            
+            panels.forEach(panel => {
+                panel.addEventListener('mousedown', startDrag);
+            });
+
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', stopDrag);
+        }
+
+        function startDrag(e) {
+            // Solo permitir arrastre si el panel está minimizado y no se hizo click en el botón toggle
+            if (!e.target.closest('.panel-minimized') || e.target.classList.contains('toggle-btn')) {
+                return;
+            }
+
+            const panel = e.target.closest('.control-panel, .legends-panel');
+            if (!panel || !panel.classList.contains('panel-minimized')) {
+                return;
+            }
+
+            isDragging = true;
+            currentPanel = panel;
+            
+            const rect = panel.getBoundingClientRect();
+            offsetX = e.clientX - rect.left;
+            offsetY = e.clientY - rect.top;
+            
+            currentPanel.classList.add('dragging');
+            e.preventDefault();
+        }
+
+        function drag(e) {
+            if (!isDragging || !currentPanel) return;
+
+            const x = e.clientX - offsetX;
+            const y = e.clientY - offsetY;
+
+            // Mantener dentro de los límites de la ventana
+            const maxX = window.innerWidth - 50;
+            const maxY = window.innerHeight - 50;
+
+            const finalX = Math.max(0, Math.min(x, maxX));
+            const finalY = Math.max(0, Math.min(y, maxY));
+
+            currentPanel.style.left = finalX + 'px';
+            currentPanel.style.top = finalY + 'px';
+        }
+
+        function stopDrag() {
+            if (currentPanel) {
+                currentPanel.classList.remove('dragging');
+            }
+            isDragging = false;
+            currentPanel = null;
+        }
+
+        let maxVolumenDescarga = 0;
+        let maxVolumenExtraccion = 0;
+        let maxIntensidadKarst = 0;
+        let minIntensidadKarst = 999;
+
+        // Almacenar datos de todas las capas para análisis espacial
+        let allLayersData = {
+            proyectos: [],
+            descargas: [],
+            extracciones: [],
+            cuerposAgua: [],
+            rios: []
+        };
+
+        // Estado de autenticación
+        let currentUser = null;
+        let mapClickEnabled = false;
+        let tempMarker = null;
+
+        // Cliente de Supabase (ya inicializado globalmente)
+        
+
+        function updateStatus(text) {
+            console.log('[STATUS]', text);
+        }
+
+        function updateLoading(text) {
+            document.getElementById('loading-text').textContent = text;
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').classList.add('hidden');
+        }
+
+        function updateLayerCount(layerId, count) {
+            const element = document.getElementById(`count-${layerId}`);
+            if (element) {
+                element.textContent = count;
+                element.classList.add('loaded');
+            }
+        }
+
+        function parseGeoJSON(geojson) {
+            if (!geojson || !geojson.coordinates) {
+                return null;
+            }
+
+            try {
+                const coords = geojson.coordinates;
+                let allPolygons = [];
+
+                for (const polygon of coords) {
+                    for (const ring of polygon) {
+                        const leafletCoords = ring.map(coord => [coord[1], coord[0]]);
+                        allPolygons.push(leafletCoords);
+                    }
+                }
+
+                return allPolygons;
+            } catch (e) {
+                console.error('Error parsing GeoJSON:', e);
+                return null;
+            }
+        }
+
+        function parseGeometry(item) {
+            try {
+                if (item.geojson) {
+                    const geom = typeof item.geojson === 'string' ? JSON.parse(item.geojson) : item.geojson;
+                    return geom;
+                }
+                if (item.geom) {
+                    if (typeof item.geom === 'string') return JSON.parse(item.geom);
+                    if (item.geom.type) return item.geom;
+                }
+                return null;
+            } catch (error) {
+                return null;
+            }
+        }
+
+        function getDescargaColor(vol) {
+            const ratio = vol / maxVolumenDescarga;
+            const r = Math.floor(125 + (3 - 125) * ratio);
+            const g = Math.floor(211 + (105 - 211) * ratio);
+            const b = Math.floor(252 + (161 - 252) * ratio);
+            return `rgb(${r},${g},${b})`;
+        }
+
+        function getExtraccionColor(vol) {
+            const ratio = vol / maxVolumenExtraccion;
+            const r = Math.floor(251 + (234 - 251) * ratio);
+            const g = Math.floor(146 + (88 - 146) * ratio);
+            const b = Math.floor(60 + (12 - 60) * ratio);
+            return `rgb(${r},${g},${b})`;
+        }
+
+        function getKarstColor(intensidad) {
+            const ratio = (intensidad - minIntensidadKarst) / (maxIntensidadKarst - minIntensidadKarst);
+            const r = Math.floor(254 + (120 - 254) * ratio);
+            const g = Math.floor(243 + (53 - 243) * ratio);
+            const b = Math.floor(199 + (15 - 199) * ratio);
+            return `rgb(${r},${g},${b})`;
+        }
+
+        function getPOELColor(politica) {
+            return COLORS.poel[politica] || COLORS.poel.default;
+        }
+
+        function getSocioEcoColor(tipo) {
+            return COLORS.socioeco[tipo] || COLORS.socioeco.default;
+        }
+
+        // ======== AUTENTICACIÓN Y PROYECTOS COLABORATIVOS ========
+
+        async function checkAuthState() {
+            try {
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                
+                if (session) {
+                    currentUser = session.user;
+                    const { data: profile } = await supabase
+                        .from('proyectos_colaborativos')
+                        .select('username')
+                        .eq('user_id', currentUser.id)
+                        .single();
+                    
+                    const username = profile?.username || currentUser.email.split('@')[0];
+                    showUserSection(username);
+                } else {
+                    currentUser = null;
+                    showLoginSection();
+                }
+            } catch (error) {
+                console.error('Error verificando autenticación:', error);
+                showLoginSection();
+            }
+        }
+
+        function showLoginSection() {
+            document.getElementById('login-section').style.display = 'block';
+            document.getElementById('user-section').style.display = 'none';
+            document.getElementById('add-project-section').style.display = 'none';
+        }
+
+        function showUserSection(username) {
+            document.getElementById('login-section').style.display = 'none';
+            document.getElementById('user-section').style.display = 'block';
+            document.getElementById('add-project-section').style.display = 'block';
+            document.getElementById('username-display').textContent = username;
+        }
+
+        async function handleLogin(email, password) {
+            const { data, error } = await supabaseClient.auth.signInWithPassword({
+                email: email,
+                password: password
+            });
+
+            if (error) throw error;
+            
+            currentUser = data.user;
+            const { data: profile } = await supabase
+                .from('proyectos_colaborativos')
+                .select('username')
+                .eq('user_id', currentUser.id)
+                .single();
+            
+            const username = profile?.username || email.split('@')[0];
+            showUserSection(username);
+            
+            // Cerrar modal y recargar proyectos colaborativos
+            document.getElementById('login-modal').style.display = 'none';
+            await loadCollaborativeProjects();
+        }
+
+        async function handleRegister(username, email, password) {
+            const { data, error } = await supabaseClient.auth.signUp({
+                email: email,
+                password: password,
+                options: {
+                    data: {
+                        username: username
+                    }
+                }
+            });
+
+            if (error) throw error;
+            
+            return data;
+        }
+
+        async function handleLogout() {
+            await supabaseClient.auth.signOut();
+            currentUser = null;
+            showLoginSection();
+            
+            // Limpiar proyectos colaborativos del mapa
+            layerGroups.proyectosColab.clearLayers();
+            updateLayerCount('proyectos-colab', 0);
+        }
+
+        async function addProjectToMap(projectData) {
+            if (!currentUser) {
+                alert('Debes iniciar sesión para agregar proyectos');
+                return;
+            }
+
+            const { data, error } = await supabase
+                .from('proyectos_colaborativos')
+                .insert([{
+                    user_id: currentUser.id,
+                    username: currentUser.user_metadata?.username || currentUser.email.split('@')[0],
+                    nombre_proyecto: projectData.nombre,
+                    descripcion: projectData.descripcion || null,
+                    mia: projectData.mia || null,
+                    irregularidad: projectData.irregularidad || null,
+                    lat: projectData.lat,
+                    lng: projectData.lng
+                }])
+                .select();
+
+            if (error) throw error;
+
+            // Agregar al mapa inmediatamente
+            await loadCollaborativeProjects();
+            
+            return data;
+        }
+
+        async function loadCollaborativeProjects() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('proyectos_colaborativos')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (error) {
+                    console.warn('Tabla de proyectos colaborativos no disponible:', error.message);
+                    return;
+                }
+
+                if (data && data.length > 0) {
+                    updateLayerCount('proyectos-colab', data.length);
+                    renderCollaborativeProjects(data);
+                    console.log(`✓ ${data.length} proyectos colaborativos cargados`);
+                } else {
+                    updateLayerCount('proyectos-colab', 0);
+                    console.log('No hay proyectos colaborativos todavía');
+                }
+            } catch (e) {
+                console.warn('Error cargando proyectos colaborativos:', e.message);
+                updateLayerCount('proyectos-colab', 0);
+            }
+        }
+
+        function renderCollaborativeProjects(data) {
+            // Limpiar capa existente
+            layerGroups.proyectosColab.clearLayers();
+            
+            data.forEach(item => {
+                const marker = L.circleMarker([item.lat, item.lng], {
+                    radius: 8,
+                    fillColor: COLORS.proyectosColab,
+                    color: '#ffffff',
+                    weight: 2,
+                    opacity: 0.9,
+                    fillOpacity: 0.9
+                });
+
+                const isOwner = currentUser && item.user_id === currentUser.id;
+                const ownerBadge = isOwner ? '<span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600;">TU PROYECTO</span>' : '';
+                
+                const popupContent = `
+                    <div class="custom-popup">
+                        <h3 style="color: ${COLORS.proyectosColab};">Proyecto Colaborativo ${ownerBadge}</h3>
+                        <div class="custom-popup-divider" style="border-color: ${COLORS.proyectosColab};">
+                            <p><strong>Nombre:</strong> ${item.nombre_proyecto}</p>
+                            ${item.descripcion ? `<p><strong>Descripción:</strong> ${item.descripcion}</p>` : ''}
+                            ${item.mia ? `<p><strong>MIA:</strong> ${item.mia}</p>` : ''}
+                            ${item.irregularidad ? `<p><strong>Irregularidad:</strong> ${item.irregularidad}</p>` : ''}
+                            <p style="color: #6b7280; font-size: 12px; margin-top: 8px;">
+                                👤 Agregado por: <strong>${item.username}</strong><br>
+                                📅 ${new Date(item.created_at).toLocaleDateString('es-MX')}
+                            </p>
+                        </div>
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent);
+                marker.addTo(layerGroups.proyectosColab);
+            });
+        }
+
+        // Función para verificar si un punto está dentro de un polígono
+        function pointInPolygon(point, polygon) {
+            const x = point[1], y = point[0]; // [lng, lat] -> x=lat, y=lng
+            let inside = false;
+            
+            for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+                const xi = polygon[i][1], yi = polygon[i][0]; // lng, lat
+                const xj = polygon[j][1], yj = polygon[j][0];
+                
+                const intersect = ((yi > y) !== (yj > y)) && 
+                    (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            
+            return inside;
+        }
+
+        // Verificar si un punto está dentro de cualquier polígono de una geometría
+        function pointInGeometry(point, geojson) {
+            if (!geojson || !geojson.coordinates) return false;
+            
+            try {
+                if (geojson.type === 'Polygon') {
+                    // Polygon: coordinates[ring][point]
+                    // Solo verificar el anillo exterior (índice 0)
+                    return pointInPolygon(point, geojson.coordinates[0]);
+                    
+                } else if (geojson.type === 'MultiPolygon') {
+                    // MultiPolygon: coordinates[polygon][ring][point]
+                    for (const polygon of geojson.coordinates) {
+                        // Solo verificar el anillo exterior de cada polígono
+                        if (pointInPolygon(point, polygon[0])) {
+                            return true;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('Error en point-in-polygon:', e);
+            }
+            
+            return false;
+        }
+
+        async function initMap() {
+            try {
+                // Verificar que Leaflet esté cargado
+                if (typeof L === 'undefined') {
+                    throw new Error('Leaflet no está cargado');
+                }
+                
+                updateLoading('Creando mapa...');
+                
+                // Inicializar grupos de capas (después de que Leaflet esté cargado)
+                layerGroups = {
+                    proyectos: L.layerGroup(),
+                    proyectosColab: L.layerGroup(),
+                    descargas: L.layerGroup(),
+                    extracciones: L.layerGroup(),
+                    cuerposAgua: L.layerGroup(),
+                    piscinas: L.layerGroup(),
+                    cenotesSup: L.layerGroup(),
+                    cenotesSub: L.layerGroup(),
+                    aguadasArt: L.layerGroup(),
+                    aguadasNat: L.layerGroup(),
+                    sascab: L.layerGroup(),
+                    rios: L.layerGroup(),
+                    karstificacion: L.layerGroup(),
+                    fallasINEGI: L.layerGroup(),
+                    fallasCENAPRED: L.layerGroup(),
+                    poel: L.layerGroup(),
+                    socioeco: L.layerGroup(),
+                    municipio: L.layerGroup()
+                };
+                
+                // Crear mapa Leaflet
+                map = L.map('map', {
+                    center: [20.849, -86.876],
+                    zoom: 12,
+                    zoomControl: true
+                });
+
+                // Capas base
+                const streets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors',
+                    maxZoom: 19
+                });
+
+                const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    attribution: 'Tiles &copy; Esri',
+                    maxZoom: 19
+                });
+
+                const hybrid = L.layerGroup([
+                    satellite,
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        opacity: 0.3,
+                        maxZoom: 19
+                    })
+                ]);
+
+                // Agregar capa satelital por defecto
+                satellite.addTo(map);
+
+                // Control de capas
+                const baseMaps = {
+                    "🛰️ Satélite": satellite,
+                    "🗺️ Híbrido": hybrid,
+                    "📍 Calles": streets
+                };
+
+                L.control.layers(baseMaps, null, {
+                    position: 'topright'
+                }).addTo(map);
+
+                console.log('✓ Mapa creado');
+
+                // Event listener para capturar coordenadas en el mapa
+                map.on('click', (e) => {
+                    if (mapClickEnabled) {
+                        const { lat, lng } = e.latlng;
+                        
+                        // Remover marcador temporal anterior
+                        if (tempMarker) {
+                            map.removeLayer(tempMarker);
+                        }
+                        
+                        // Agregar marcador temporal
+                        tempMarker = L.marker([lat, lng], {
+                            icon: L.divIcon({
+                                className: 'temp-marker',
+                                html: '<div style="background: #9333ea; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>',
+                                iconSize: [20, 20],
+                                iconAnchor: [10, 10]
+                            })
+                        }).addTo(map);
+                        
+                        // Actualizar campos del formulario
+                        document.getElementById('project-lat').value = lat.toFixed(6);
+                        document.getElementById('project-lng').value = lng.toFixed(6);
+                        
+                        // Desactivar modo click
+                        mapClickEnabled = false;
+                        document.getElementById('enable-map-click').textContent = '✓ Coordenadas capturadas';
+                        document.getElementById('enable-map-click').style.background = '#10b981';
+                        map.getContainer().style.cursor = '';
+                        
+                        setTimeout(() => {
+                            document.getElementById('enable-map-click').textContent = '📍 Activar Click en Mapa';
+                            document.getElementById('enable-map-click').style.background = '#3b82f6';
+                        }, 2000);
+                    }
+                });
+
+                // Agregar grupos de capas al mapa
+                Object.values(layerGroups).forEach(group => group.addTo(map));
+
+                await loadAllLayers();
+
+                updateStatus('Geoportal listo ✓');
+                hideLoading();
+                console.log('=== COMPLETADO ===');
+
+            } catch (error) {
+                console.error('ERROR:', error);
+                updateStatus('Error: ' + error.message);
+            }
+        }
+
+        async function loadAllLayers() {
+            // PROYECTOS TI
+            try {
+                updateLoading('Cargando proyectos TI...');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/proyectos_ti?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        updateLayerCount('proyectos', data.length);
+                        renderProyectos(data);
+                        console.log(`✓ ${data.length} proyectos cargados`);
+                    }
+                }
+            } catch (e) { console.error('Error proyectos:', e); }
+
+            // DESCARGAS
+            try {
+                updateLoading('Cargando descargas de agua...');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('clip de descarga de agua 2023')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                console.log('Descargas response status:', response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Descargas data loaded:', data.length, 'items');
+                    if (data && data.length > 0) {
+                        maxVolumenDescarga = Math.max(...data.map(d => d.vol || 0));
+                        console.log('Max volumen descarga:', maxVolumenDescarga);
+                        updateLayerCount('descargas', data.length);
+                        renderDescargas(data);
+                        console.log(`✓ ${data.length} descargas cargadas`);
+                    }
+                } else {
+                    console.error('Error loading descargas:', response.status, response.statusText);
+                }
+            } catch (e) { 
+                console.error('Error descargas:', e);
+                console.error('Stack:', e.stack);
+            }
+
+            // EXTRACCIONES
+            try {
+                updateLoading('Cargando extracciones de agua...');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('clip de extracción de agua 2023')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                console.log('Extracciones response status:', response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Extracciones data loaded:', data.length, 'items');
+                    if (data && data.length > 0) {
+                        maxVolumenExtraccion = Math.max(...data.map(d => d.vol || 0));
+                        console.log('Max volumen extracción:', maxVolumenExtraccion);
+                        updateLayerCount('extracciones', data.length);
+                        renderExtracciones(data);
+                        console.log(`✓ ${data.length} extracciones cargadas`);
+                    }
+                } else {
+                    console.error('Error loading extracciones:', response.status, response.statusText);
+                }
+            } catch (e) { 
+                console.error('Error extracciones:', e);
+                console.error('Stack:', e.stack);
+            }
+
+            // CUERPOS DE AGUA (IAHCSA)
+            try {
+                updateLoading('Cargando cuerpos de agua...');
+                
+                const url = `${SUPABASE_URL}/rest/v1/${encodeURIComponent('IAHCSA_GEOPORTAL_TOMALASAGUAS — indice_de_antropizacion_del_a')}?select=*`;
+                const response = await fetch(url, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        updateLayerCount('cuerpos-agua', data.length);
+                        renderCuerposAgua(data);
+                        console.log(`✓ ${data.length} cuerpos de agua cargados`);
+                    }
+                }
+            } catch (e) { console.error('Error cuerpos de agua:', e); }
+
+            // KARSTIFICACIÓN (solo medio a muy alto)
+            try {
+                updateLoading('Cargando karstificación...');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('Karstificación')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        // Filtrar solo intensidades medias a altas (>=5)
+                        const filteredData = data.filter(d => (d.intensidad || 0) >= 5);
+                        
+                        const intensidades = filteredData.map(d => d.intensidad || 0).filter(i => i > 0);
+                        maxIntensidadKarst = Math.max(...intensidades);
+                        minIntensidadKarst = Math.min(...intensidades);
+                        
+                        updateLayerCount('karstificacion', filteredData.length);
+                        renderKarstificacion(filteredData);
+                        console.log(`✓ ${filteredData.length} polígonos de karstificación (medio-alto) cargados`);
+                    }
+                }
+            } catch (e) { console.error('Error karstificación:', e); }
+
+            // FALLAS INEGI
+            try {
+                updateLoading('Cargando fallas INEGI...');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('Fallas (INEGI) — clip_fallas2_inegi')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                console.log('Fallas INEGI response status:', response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Fallas INEGI data loaded:', data.length, 'items');
+                    if (data && data.length > 0) {
+                        updateLayerCount('fallas-inegi', data.length);
+                        renderFallasINEGI(data);
+                        console.log(`✓ ${data.length} fallas INEGI cargadas`);
+                    }
+                } else {
+                    console.error('Error loading fallas INEGI:', response.status, response.statusText);
+                }
+            } catch (e) { 
+                console.error('Error fallas INEGI:', e);
+                console.error('Stack:', e.stack);
+            }
+
+            // FALLAS CENAPRED
+            try {
+                updateLoading('Cargando fallas CENAPRED...');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('fallas(CENAPRED) — clip_fallas1_cenapred')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                console.log('Fallas CENAPRED response status:', response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Fallas CENAPRED data loaded:', data.length, 'items');
+                    if (data && data.length > 0) {
+                        updateLayerCount('fallas-cenapred', data.length);
+                        renderFallasCENAPRED(data);
+                        console.log(`✓ ${data.length} fallas CENAPRED cargadas`);
+                    }
+                } else {
+                    console.error('Error loading fallas CENAPRED:', response.status, response.statusText);
+                }
+            } catch (e) { 
+                console.error('Error fallas CENAPRED:', e);
+                console.error('Stack:', e.stack);
+            }
+
+            // SOCIOECOSISTEMA
+            try {
+                updateLoading('Cargando socioecosistema...');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('poligonos_del_socioecosistema — shapes')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        updateLayerCount('socioeco', data.length);
+                        renderSocioecosistema(data);
+                        console.log(`✓ ${data.length} polígonos socioecosistema cargados`);
+                    }
+                }
+            } catch (e) { console.error('Error socioecosistema:', e); }
+
+            // MUNICIPIO
+            try {
+                updateLoading('Cargando municipio...');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('Poligono_mun_pomo — municipio_puerto_morelos_')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        updateLayerCount('municipio', data.length);
+                        renderMunicipio(data);
+                        console.log(`✓ ${data.length} límite municipal cargado`);
+                    }
+                }
+            } catch (e) { console.error('Error municipio:', e); }
+
+            // POEL 2013 - Cargar al final para análisis espacial
+            try {
+                updateLoading('Cargando y analizando POEL 2013...');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('poel_2013_ — poel_clip_poel2013_oficial_clip_unico')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        updateLayerCount('poel', data.length);
+                        renderPOEL(data);
+                        console.log(`✓ ${data.length} polígonos POEL cargados y analizados`);
+                    }
+                }
+            } catch (e) { console.error('Error POEL:', e); }
+        }
+
+        function renderCuerposAgua(data) {
+            const typeNames = {
+                'piscina': 'Piscina',
+                'cenote_s_a': 'Cenote Modificado',
+                'cenote_s_s': 'Cenote Artificial',
+                'aguada_a': 'Aguada Antropizada',
+                'aguada_n': 'Aguada Natural',
+                'sascab_ce': 'Sascabera',
+                'rio_a': 'Río Artificial'
+            };
+
+            const typeCounters = {};
+            const typeAreas = {}; // Para sumar áreas por tipo
+            let totalArea = 0;
+
+            data.forEach(item => {
+                const geom = item.geom;
+                if (!geom || (geom.type !== 'MultiPolygon' && geom.type !== 'Polygon')) return;
+
+                const clase = item.CLASE || 'default';
+                const areaHa = parseFloat(item['ha_cuerp_agua-sup']) || 0;
+                const areaM2 = areaHa * 10000; // Convertir hectáreas a m²
+                const color = COLORS.cuerposAgua[clase] || COLORS.cuerposAgua.default;
+
+                if (!typeCounters[clase]) {
+                    typeCounters[clase] = 0;
+                    typeAreas[clase] = 0;
+                }
+                typeCounters[clase]++;
+                typeAreas[clase] += areaM2;
+                totalArea += areaM2;
+
+                const coords = parseGeoJSON(geom);
+                if (coords && coords.length > 0) {
+                    // Calcular centroide simple (promedio de coordenadas del primer ring)
+                    const firstRing = coords[0];
+                    let sumLat = 0, sumLng = 0;
+                    firstRing.forEach(coord => {
+                        sumLat += coord[0];
+                        sumLng += coord[1];
+                    });
+                    const centroidLat = sumLat / firstRing.length;
+                    const centroidLng = sumLng / firstRing.length;
+
+                    const typeName = typeNames[clase] || clase;
+
+                    // Guardar para análisis espacial
+                    allLayersData.cuerposAgua.push({
+                        lat: centroidLat,
+                        lng: centroidLng,
+                        area: areaM2,
+                        tipo: typeName,
+                        clase: clase
+                    });
+
+                    if (clase === 'rio_a') {
+                        allLayersData.rios.push({
+                            lat: centroidLat,
+                            lng: centroidLng,
+                            area: areaM2,
+                            tipo: 'Río Artificial'
+                        });
+                    }
+
+                    const polygon = L.polygon(coords, {
+                        color: color,
+                        fillColor: color,
+                        fillOpacity: 0.4,
+                        weight: 2,
+                        opacity: 0.8
+                    });
+                    
+                    const popupContent = `
+                        <div class="custom-popup">
+                            <h3 style="color: ${color};">${typeName}</h3>
+                            <div class="custom-popup-divider" style="border-color: ${color};">
+                                <p><strong>Área:</strong> ${areaM2.toLocaleString('es-MX', {maximumFractionDigits: 0})} m²</p>
+                                ${item.nombre ? `<p><strong>Ubicación:</strong> ${item.nombre}</p>` : ''}
+                                ${item.Politica ? `<p><strong>Política:</strong> ${item.Politica}</p>` : ''}
+                                ${item.clase_valor ? `<p><strong>Índice:</strong> ${item.clase_valor}</p>` : ''}
+                            </div>
+                        </div>
+                    `;
+
+                    polygon.bindPopup(popupContent, {
+                        maxWidth: 300,
+                        closeButton: true
+                    });
+
+                    // Efecto hover
+                    polygon.on('mouseover', function() {
+                        this.setStyle({
+                            fillOpacity: 0.6,
+                            weight: 3
+                        });
+                    });
+
+                    polygon.on('mouseout', function() {
+                        this.setStyle({
+                            fillOpacity: 0.4,
+                            weight: 2
+                        });
+                    });
+
+                    // Agregar a grupos
+                    polygon.addTo(layerGroups.cuerposAgua);
+                    
+                    if (clase === 'piscina') polygon.addTo(layerGroups.piscinas);
+                    else if (clase === 'cenote_s_a') polygon.addTo(layerGroups.cenotesSup);
+                    else if (clase === 'cenote_s_s') polygon.addTo(layerGroups.cenotesSub);
+                    else if (clase === 'aguada_a') polygon.addTo(layerGroups.aguadasArt);
+                    else if (clase === 'aguada_n') polygon.addTo(layerGroups.aguadasNat);
+                    else if (clase === 'sascab_ce') polygon.addTo(layerGroups.sascab);
+                    else if (clase === 'rio_a') polygon.addTo(layerGroups.rios);
+                }
+            });
+
+            // Actualizar contadores
+            updateLayerCount('piscinas', typeCounters['piscina'] || 0);
+            updateLayerCount('cenotes-sup', typeCounters['cenote_s_a'] || 0);
+            updateLayerCount('cenotes-sub', typeCounters['cenote_s_s'] || 0);
+            updateLayerCount('aguadas-art', typeCounters['aguada_a'] || 0);
+            updateLayerCount('aguadas-nat', typeCounters['aguada_n'] || 0);
+            updateLayerCount('sascab', typeCounters['sascab_ce'] || 0);
+            updateLayerCount('rios', typeCounters['rio_a'] || 0);
+
+            // Actualizar áreas
+            if (typeAreas['piscina']) {
+                document.getElementById('area-piscinas').textContent = 
+                    `${typeAreas['piscina'].toLocaleString('es-MX', {maximumFractionDigits: 0})} m²`;
+            }
+            if (typeAreas['cenote_s_a']) {
+                document.getElementById('area-cenotes-sup').textContent = 
+                    `${typeAreas['cenote_s_a'].toLocaleString('es-MX', {maximumFractionDigits: 0})} m²`;
+            }
+            if (typeAreas['cenote_s_s']) {
+                document.getElementById('area-cenotes-sub').textContent = 
+                    `${typeAreas['cenote_s_s'].toLocaleString('es-MX', {maximumFractionDigits: 0})} m²`;
+            }
+            if (typeAreas['aguada_a']) {
+                document.getElementById('area-aguadas-art').textContent = 
+                    `${typeAreas['aguada_a'].toLocaleString('es-MX', {maximumFractionDigits: 0})} m²`;
+            }
+            if (typeAreas['aguada_n']) {
+                document.getElementById('area-aguadas-nat').textContent = 
+                    `${typeAreas['aguada_n'].toLocaleString('es-MX', {maximumFractionDigits: 0})} m²`;
+            }
+            if (typeAreas['sascab_ce']) {
+                document.getElementById('area-sascab').textContent = 
+                    `${typeAreas['sascab_ce'].toLocaleString('es-MX', {maximumFractionDigits: 0})} m²`;
+            }
+            if (typeAreas['rio_a']) {
+                document.getElementById('area-rios').textContent = 
+                    `${typeAreas['rio_a'].toLocaleString('es-MX', {maximumFractionDigits: 0})} m²`;
+            }
+
+            // Actualizar total
+            document.getElementById('total-area-cuerpos').textContent = 
+                totalArea.toLocaleString('es-MX', {maximumFractionDigits: 0});
+
+            console.log(`✓ Cuerpos de agua renderizados por tipo:`, typeCounters);
+            console.log(`✓ Área total: ${totalArea.toLocaleString('es-MX')} m²`);
+        }
+
+        function renderProyectos(data) {
+            data.forEach(item => {
+                const geom = parseGeometry(item);
+                if (!geom || geom.type !== 'Point') return;
+
+                const lat = geom.coordinates[1];
+                const lng = geom.coordinates[0];
+
+                // Guardar para análisis espacial
+                allLayersData.proyectos.push({
+                    lat: lat,
+                    lng: lng,
+                    nombre: item["Nombre_Poy"] || 'Proyecto',
+                    tipo: 'Proyecto Inmobiliario-turístico'
+                });
+
+                const marker = L.circleMarker([lat, lng], {
+                    radius: 8,
+                    fillColor: COLORS.proyectos,
+                    color: '#ffffff',
+                    weight: 2,
+                    opacity: 0.9,
+                    fillOpacity: 0.9
+                });
+
+                const popupContent = `
+                    <div class="custom-popup">
+                        <h3 style="color: ${COLORS.proyectos};">Proyecto Inmobiliario-turístico</h3>
+                        <div class="custom-popup-divider" style="border-color: ${COLORS.proyectos};">
+                            <p><strong>Nombre:</strong> ${item["Nombre_Poy"] || 'N/A'}</p>
+                            <p><strong>MIA:</strong> ${item["MIA"] || 'N/A'}</p>
+                            <p><strong>Irregularidad:</strong> ${item["¿Ilegalidad o irregularidad?"] || 'N/A'}</p>
+                        </div>
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent);
+                marker.addTo(layerGroups.proyectos);
+            });
+        }
+
+        function renderDescargas(data) {
+            console.log('Renderizando descargas, total:', data.length);
+            let rendered = 0;
+            
+            data.forEach((item, index) => {
+                const geom = parseGeometry(item);
+                
+                // Debug para primeros items
+                if (index < 3) {
+                    console.log(`Descarga ${index}:`, {
+                        geom: geom,
+                        tipo: geom?.type,
+                        vol: item.vol
+                    });
+                }
+                
+                if (!geom) {
+                    console.warn('Sin geometría en descarga', index);
+                    return;
+                }
+                
+                // Manejar Point o MultiPoint
+                let lat, lng;
+                if (geom.type === 'Point') {
+                    lat = geom.coordinates[1];
+                    lng = geom.coordinates[0];
+                } else if (geom.type === 'MultiPoint' && geom.coordinates.length > 0) {
+                    lat = geom.coordinates[0][1];
+                    lng = geom.coordinates[0][0];
+                } else {
+                    if (index < 3) console.warn('Tipo de geometría no Point:', geom.type);
+                    return;
+                }
+
+                const vol = item.vol || 0;
+                const color = getDescargaColor(vol);
+
+                // Guardar para análisis espacial
+                allLayersData.descargas.push({
+                    lat: lat,
+                    lng: lng,
+                    vol: vol,
+                    tipo: 'Descarga'
+                });
+
+                const marker = L.circleMarker([lat, lng], {
+                    radius: 6 + (vol / maxVolumenDescarga) * 8,
+                    fillColor: color,
+                    color: '#ffffff',
+                    weight: 1,
+                    opacity: 0.8,
+                    fillOpacity: 0.6
+                });
+
+                const popupContent = `
+                    <div class="custom-popup">
+                        <h3 style="color: #0369a1;">💧 Descarga de Agua</h3>
+                        <div class="custom-popup-divider" style="border-color: #0369a1;">
+                            <p><strong>📋 Titular:</strong> ${item.titular || 'No especificado'}</p>
+                            <p><strong>🏷️ Tipo de Uso:</strong> ${item.uso || 'No especificado'}</p>
+                            <p><strong>📊 Volumen Concesionado:</strong> ${vol.toFixed(2)} hm³/año</p>
+                            <p><strong>📅 Registro:</strong> ${item.registr || 'No registrada'}</p>
+                            <p><strong>🏛️ Autoridad:</strong> ${item.autordd || 'N/A'}</p>
+                            ${item.titulo ? `<p><strong>📄 Título:</strong> ${item.titulo}</p>` : ''}
+                            ${item.estado ? `<p><strong>📍 Estado:</strong> ${item.estado}</p>` : ''}
+                            ${item.mpo ? `<p><strong>🏘️ Municipio:</strong> ${item.mpo}</p>` : ''}
+                            ${item.cuenca ? `<p><strong>🌊 Cuenca:</strong> ${item.cuenca}</p>` : ''}
+                            ${item.cuerpo ? `<p><strong>💦 Cuerpo Receptor:</strong> ${item.cuerpo}</p>` : ''}
+                        </div>
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent);
+                marker.addTo(layerGroups.descargas);
+                rendered++;
+            });
+            
+            console.log(`✓ ${rendered} descargas renderizadas`);
+        }
+
+        function renderExtracciones(data) {
+            console.log('Renderizando extracciones, total:', data.length);
+            let rendered = 0;
+            
+            data.forEach((item, index) => {
+                const geom = parseGeometry(item);
+                
+                // Debug para primeros items
+                if (index < 3) {
+                    console.log(`Extracción ${index}:`, {
+                        geom: geom,
+                        tipo: geom?.type,
+                        vol: item.vol
+                    });
+                }
+                
+                if (!geom) {
+                    console.warn('Sin geometría en extracción', index);
+                    return;
+                }
+                
+                // Manejar Point o MultiPoint
+                let lat, lng;
+                if (geom.type === 'Point') {
+                    lat = geom.coordinates[1];
+                    lng = geom.coordinates[0];
+                } else if (geom.type === 'MultiPoint' && geom.coordinates.length > 0) {
+                    lat = geom.coordinates[0][1];
+                    lng = geom.coordinates[0][0];
+                } else {
+                    if (index < 3) console.warn('Tipo de geometría no Point:', geom.type);
+                    return;
+                }
+
+                const vol = item.vol || 0;
+                const color = getExtraccionColor(vol);
+
+                // Guardar para análisis espacial
+                allLayersData.extracciones.push({
+                    lat: lat,
+                    lng: lng,
+                    vol: vol,
+                    tipo: 'Extracción'
+                });
+
+                const marker = L.circleMarker([lat, lng], {
+                    radius: 6 + (vol / maxVolumenExtraccion) * 8,
+                    fillColor: color,
+                    color: '#ffffff',
+                    weight: 1,
+                    opacity: 0.8,
+                    fillOpacity: 0.6
+                });
+
+                const popupContent = `
+                    <div class="custom-popup">
+                        <h3 style="color: #ea580c;">⚡ Extracción de Agua</h3>
+                        <div class="custom-popup-divider" style="border-color: #ea580c;">
+                            <p><strong>📋 Titular:</strong> ${item.titular || 'No especificado'}</p>
+                            <p><strong>🏷️ Tipo de Uso:</strong> ${item.uso || 'No especificado'}</p>
+                            <p><strong>📊 Volumen Concesionado:</strong> ${vol.toFixed(2)} hm³/año</p>
+                            <p><strong>📅 Fecha de Registro:</strong> ${item.dia || ''}/${item.mes || ''}/${item.año || ''}</p>
+                            <p><strong>🏛️ Autoridad:</strong> ${item.autoridad || 'N/A'}</p>
+                            ${item.titulo ? `<p><strong>📄 Título:</strong> ${item.titulo}</p>` : ''}
+                            ${item.estado ? `<p><strong>📍 Estado:</strong> ${item.estado}</p>` : ''}
+                            ${item.mpo ? `<p><strong>🏘️ Municipio:</strong> ${item.mpo}</p>` : ''}
+                            ${item.cuenca ? `<p><strong>🌊 Cuenca:</strong> ${item.cuenca}</p>` : ''}
+                            ${item.fuente ? `<p><strong>🚰 Fuente:</strong> ${item.fuente}</p>` : ''}
+                        </div>
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent);
+                marker.addTo(layerGroups.extracciones);
+                rendered++;
+            });
+            
+            console.log(`✓ ${rendered} extracciones renderizadas`);
+        }
+
+        function renderKarstificacion(data) {
+            data.forEach(item => {
+                const geom = parseGeometry(item);
+                if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+
+                const intensidad = item.intensidad || 0;
+                const color = getKarstColor(intensidad);
+
+                const coords = parseGeoJSON(geom);
+                if (coords && coords.length > 0) {
+                    const polygon = L.polygon(coords, {
+                        color: '#fbbf24',
+                        fillColor: color,
+                        fillOpacity: 0.5,
+                        weight: 2,
+                        opacity: 0.9
+                    });
+
+                    const popupContent = `
+                        <div class="custom-popup">
+                            <h3 style="color: #78350f;">Karstificación</h3>
+                            <div class="custom-popup-divider" style="border-color: #78350f;">
+                                <p><strong>Categoría:</strong> ${item.cat || 'N/A'}</p>
+                                <p><strong>Intensidad:</strong> ${intensidad}</p>
+                                <p><strong>Hectáreas:</strong> ${(item.ha_cat || 0).toLocaleString()}</p>
+                            </div>
+                        </div>
+                    `;
+
+                    polygon.bindPopup(popupContent);
+                    
+                    polygon.on('mouseover', function() {
+                        this.setStyle({ fillOpacity: 0.7, weight: 3 });
+                    });
+                    polygon.on('mouseout', function() {
+                        this.setStyle({ fillOpacity: 0.5, weight: 2 });
+                    });
+
+                    polygon.addTo(layerGroups.karstificacion);
+                }
+            });
+        }
+
+        function renderFallasINEGI(data) {
+            console.log('Renderizando fallas INEGI, total:', data.length);
+            let rendered = 0;
+            
+            data.forEach((item, index) => {
+                const geom = parseGeometry(item);
+                
+                // Debug para primeros items
+                if (index < 3) {
+                    console.log(`Falla INEGI ${index}:`, {
+                        geom: geom,
+                        tipo: geom?.type
+                    });
+                }
+                
+                if (!geom) {
+                    console.warn('Sin geometría en falla INEGI', index);
+                    return;
+                }
+                
+                // Manejar LineString o MultiLineString
+                let linesToDraw = [];
+                
+                if (geom.type === 'LineString') {
+                    linesToDraw.push(geom.coordinates);
+                } else if (geom.type === 'MultiLineString') {
+                    linesToDraw = geom.coordinates;
+                } else {
+                    if (index < 3) console.warn('Tipo de geometría no LineString:', geom.type);
+                    return;
+                }
+
+                linesToDraw.forEach(lineCoords => {
+                    const coords = lineCoords.map(coord => [coord[1], coord[0]]);
+
+                    const line = L.polyline(coords, {
+                        color: COLORS.fallasINEGI,
+                        weight: 3,
+                        opacity: 0.8
+                    });
+
+                    const popupContent = `
+                        <div class="custom-popup">
+                            <h3 style="color: ${COLORS.fallasINEGI};">Falla Geológica INEGI</h3>
+                            <div class="custom-popup-divider" style="border-color: ${COLORS.fallasINEGI};">
+                                <p><strong>Fuente:</strong> INEGI</p>
+                            </div>
+                        </div>
+                    `;
+
+                    line.bindPopup(popupContent);
+                    line.addTo(layerGroups.fallasINEGI);
+                    rendered++;
+                });
+            });
+            
+            console.log(`✓ ${rendered} fallas INEGI renderizadas`);
+        }
+
+        function renderFallasCENAPRED(data) {
+            console.log('Renderizando fallas CENAPRED, total:', data.length);
+            let rendered = 0;
+            
+            data.forEach((item, index) => {
+                const geom = parseGeometry(item);
+                
+                // Debug para primeros items
+                if (index < 3) {
+                    console.log(`Falla CENAPRED ${index}:`, {
+                        geom: geom,
+                        tipo: geom?.type
+                    });
+                }
+                
+                if (!geom) {
+                    console.warn('Sin geometría en falla CENAPRED', index);
+                    return;
+                }
+                
+                // Manejar LineString o MultiLineString
+                let linesToDraw = [];
+                
+                if (geom.type === 'LineString') {
+                    linesToDraw.push(geom.coordinates);
+                } else if (geom.type === 'MultiLineString') {
+                    linesToDraw = geom.coordinates;
+                } else {
+                    if (index < 3) console.warn('Tipo de geometría no LineString:', geom.type);
+                    return;
+                }
+
+                linesToDraw.forEach(lineCoords => {
+                    const coords = lineCoords.map(coord => [coord[1], coord[0]]);
+
+                    const line = L.polyline(coords, {
+                        color: COLORS.fallasCENAPRED,
+                        weight: 3,
+                        opacity: 0.8
+                    });
+
+                    const popupContent = `
+                        <div class="custom-popup">
+                            <h3 style="color: ${COLORS.fallasCENAPRED};">Falla Geológica CENAPRED</h3>
+                            <div class="custom-popup-divider" style="border-color: ${COLORS.fallasCENAPRED};">
+                                <p><strong>Fuente:</strong> CENAPRED</p>
+                            </div>
+                        </div>
+                    `;
+
+                    line.bindPopup(popupContent);
+                    line.addTo(layerGroups.fallasCENAPRED);
+                    rendered++;
+                });
+            });
+            
+            console.log(`✓ ${rendered} fallas CENAPRED renderizadas`);
+        }
+
+        function renderPOEL(data) {
+            console.log('Analizando elementos dentro de POEL UGAs...');
+            
+            // Primero, agrupar TODOS los polígonos por UGA
+            const ugaPolygons = {};
+            const ugaData = {};
+            
+            data.forEach(item => {
+                const geom = parseGeometry(item);
+                if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+                
+                const uga = item.UGA || 'N/A';
+                const politica = item["Política"] || 'default';
+                const aprovechamiento = item.Aprovechamiento || item.Aprovecha || 'N/A';
+                const area = parseFloat(item.ha_uga || item.ha || 0) * 10000;
+                
+                if (!ugaPolygons[uga]) {
+                    ugaPolygons[uga] = [];
+                    ugaData[uga] = {
+                        politica: politica,
+                        aprovechamiento: aprovechamiento,
+                        area: area,
+                        proyectos: 0,
+                        descargas: {count: 0, vol: 0},
+                        extracciones: {count: 0, vol: 0},
+                        cuerposAgua: {},
+                        riosArt: {count: 0, area: 0}
+                    };
+                }
+                
+                ugaPolygons[uga].push(geom);
+            });
+
+            // Ahora analizar cada elemento contra TODOS los polígonos de cada UGA
+            console.log(`Analizando ${Object.keys(ugaPolygons).length} UGAs...`);
+            console.log(`Total elementos a verificar: ${allLayersData.proyectos.length} proyectos, ${allLayersData.descargas.length} descargas, ${allLayersData.extracciones.length} extracciones, ${allLayersData.cuerposAgua.length} cuerpos de agua`);
+            
+            Object.entries(ugaPolygons).forEach(([uga, polygons]) => {
+                const ugaInfo = ugaData[uga];
+                
+                // Debug detallado para UGAs específicas
+                const debugUGA = ['11', '16b', '16B'].includes(uga);
+                if (debugUGA) {
+                    console.log(`=== Analizando UGA ${uga} ===`);
+                    console.log(`Polígonos en UGA: ${polygons.length}`);
+                    polygons.forEach((p, i) => {
+                        console.log(`  Polígono ${i}: tipo=${p.type}, coords length=${p.coordinates?.length}`);
+                    });
+                }
+                
+                // Verificar proyectos
+                allLayersData.proyectos.forEach((proyecto, idx) => {
+                    for (const geom of polygons) {
+                        if (pointInGeometry([proyecto.lng, proyecto.lat], geom)) {
+                            ugaInfo.proyectos++;
+                            if (debugUGA) console.log(`  ✓ Proyecto ${idx} dentro: [${proyecto.lat}, ${proyecto.lng}]`);
+                            break;
+                        }
+                    }
+                });
+
+                // Verificar descargas
+                allLayersData.descargas.forEach((descarga, idx) => {
+                    for (const geom of polygons) {
+                        if (pointInGeometry([descarga.lng, descarga.lat], geom)) {
+                            ugaInfo.descargas.count++;
+                            ugaInfo.descargas.vol += descarga.vol;
+                            if (debugUGA) console.log(`  ✓ Descarga ${idx} dentro: [${descarga.lat}, ${descarga.lng}]`);
+                            break;
+                        }
+                    }
+                });
+
+                // Verificar extracciones
+                allLayersData.extracciones.forEach((extraccion, idx) => {
+                    for (const geom of polygons) {
+                        if (pointInGeometry([extraccion.lng, extraccion.lat], geom)) {
+                            ugaInfo.extracciones.count++;
+                            ugaInfo.extracciones.vol += extraccion.vol;
+                            if (debugUGA) console.log(`  ✓ Extracción ${idx} dentro: [${extraccion.lat}, ${extraccion.lng}]`);
+                            break;
+                        }
+                    }
+                });
+
+                // Verificar cuerpos de agua
+                allLayersData.cuerposAgua.forEach((cuerpo, idx) => {
+                    for (const geom of polygons) {
+                        if (pointInGeometry([cuerpo.lng, cuerpo.lat], geom)) {
+                            if (!ugaInfo.cuerposAgua[cuerpo.tipo]) {
+                                ugaInfo.cuerposAgua[cuerpo.tipo] = {count: 0, area: 0};
+                            }
+                            ugaInfo.cuerposAgua[cuerpo.tipo].count++;
+                            ugaInfo.cuerposAgua[cuerpo.tipo].area += cuerpo.area;
+                            if (debugUGA && idx < 5) console.log(`  ✓ ${cuerpo.tipo} ${idx} dentro: [${cuerpo.lat}, ${cuerpo.lng}]`);
+                            break;
+                        }
+                    }
+                });
+
+                // Verificar ríos artificiales
+                allLayersData.rios.forEach((rio, idx) => {
+                    for (const geom of polygons) {
+                        if (pointInGeometry([rio.lng, rio.lat], geom)) {
+                            ugaInfo.riosArt.count++;
+                            ugaInfo.riosArt.area += rio.area;
+                            if (debugUGA) console.log(`  ✓ Río artificial ${idx} dentro: [${rio.lat}, ${rio.lng}]`);
+                            break;
+                        }
+                    }
+                });
+                
+                if (debugUGA || ugaInfo.proyectos > 0 || ugaInfo.descargas.count > 0) {
+                    console.log(`UGA ${uga}: ${ugaInfo.proyectos} proyectos, ${ugaInfo.descargas.count} descargas, ${ugaInfo.extracciones.count} extracciones, ${Object.keys(ugaInfo.cuerposAgua).length} tipos de cuerpos`);
+                }
+            });
+
+            // Ahora renderizar los polígonos
+            const politicasCount = {};
+            const ugasByPolitica = {}; // Agrupar UGAs por política
+            
+            data.forEach(item => {
+                const geom = parseGeometry(item);
+                if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+
+                const politica = item["Política"] || 'default';
+                const uga = item.UGA || 'N/A';
+                const color = getPOELColor(politica);
+
+                if (!politicasCount[politica]) {
+                    politicasCount[politica] = 0;
+                    ugasByPolitica[politica] = new Set();
+                }
+                politicasCount[politica]++;
+                ugasByPolitica[politica].add(uga); // Agregar UGA al set (evita duplicados)
+
+                const coords = parseGeoJSON(geom);
+                if (coords && coords.length > 0) {
+                    const polygon = L.polygon(coords, {
+                        color: color,
+                        fillColor: color,
+                        fillOpacity: 0.3,
+                        weight: 2,
+                        opacity: 0.8
+                    });
+
+                    const ugaInfo = ugaData[uga];
+                    
+                    // Construir popup con toda la información
+                    let elementosHTML = '';
+                    
+                    if (ugaInfo.proyectos > 0) {
+                        elementosHTML += `<p>• <strong>${ugaInfo.proyectos}</strong> Proyectos Inmobiliarios-turísticos</p>`;
+                    }
+                    
+                    if (ugaInfo.descargas.count > 0) {
+                        elementosHTML += `<p>• <strong>${ugaInfo.descargas.count}</strong> Descargas (${ugaInfo.descargas.vol.toFixed(2)} hm³/año)</p>`;
+                    }
+                    
+                    if (ugaInfo.extracciones.count > 0) {
+                        elementosHTML += `<p>• <strong>${ugaInfo.extracciones.count}</strong> Extracciones (${ugaInfo.extracciones.vol.toFixed(2)} hm³/año)</p>`;
+                    }
+
+                    if (ugaInfo.riosArt.count > 0) {
+                        elementosHTML += `<p>• <strong>${ugaInfo.riosArt.count}</strong> Ríos Artificiales (${ugaInfo.riosArt.area.toLocaleString('es-MX', {maximumFractionDigits: 0})} m²)</p>`;
+                    }
+
+                    // Cuerpos de agua por tipo
+                    Object.entries(ugaInfo.cuerposAgua).forEach(([tipo, data]) => {
+                        if (tipo !== 'Río Artificial' && data.count > 0) {
+                            elementosHTML += `<p>• <strong>${data.count}</strong> ${tipo}${data.count > 1 ? 's' : ''} (${data.area.toLocaleString('es-MX', {maximumFractionDigits: 0})} m²)</p>`;
+                        }
+                    });
+
+                    if (elementosHTML === '') {
+                        elementosHTML = '<p style="color: #9ca3af; font-style: italic;">No hay elementos mapeados en esta UGA</p>';
+                    }
+                    
+                    const popupContent = `
+                        <div class="custom-popup">
+                            <h3 style="color: ${color};">UGA ${uga}</h3>
+                            <div class="custom-popup-divider" style="border-color: ${color};">
+                                <p><strong>Política:</strong> ${politica}</p>
+                                <p><strong>Área UGA:</strong> ${ugaInfo.area.toLocaleString('es-MX', {maximumFractionDigits: 0})} m²</p>
+                                <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 8px 0;">
+                                <strong style="color: #4a5568;">Elementos en esta UGA:</strong>
+                                ${elementosHTML}
+                            </div>
+                        </div>
+                    `;
+
+                    polygon.bindPopup(popupContent, {
+                        maxWidth: 350
+                    });
+                    
+                    polygon.on('mouseover', function() {
+                        this.setStyle({ fillOpacity: 0.5, weight: 3 });
+                    });
+                    polygon.on('mouseout', function() {
+                        this.setStyle({ fillOpacity: 0.3, weight: 2 });
+                    });
+
+                    polygon.addTo(layerGroups.poel);
+                }
+            });
+            
+            // Generar leyenda dinámica con nombres de UGAs
+            const legendItems = document.getElementById('legend-poel-items');
+            let legendHTML = '';
+            
+            // Ordenar políticas por número de polígonos (descendente)
+            const sortedPoliticas = Object.entries(politicasCount).sort((a, b) => b[1] - a[1]);
+            
+            sortedPoliticas.forEach(([politica, count]) => {
+                const color = getPOELColor(politica);
+                const ugas = Array.from(ugasByPolitica[politica]).sort((a, b) => {
+                    // Ordenar UGAs numéricamente
+                    const numA = parseInt(a.replace(/[^0-9]/g, '')) || 0;
+                    const numB = parseInt(b.replace(/[^0-9]/g, '')) || 0;
+                    return numA - numB;
+                });
+                
+                legendHTML += `
+                    <div style="margin-bottom: 8px;">
+                        <div style="display: flex; align-items: center; margin-bottom: 3px;">
+                            <div style="width: 12px; height: 12px; background: ${color}; border-radius: 2px; margin-right: 6px;"></div>
+                            <strong style="font-size: 10px; color: #4a5568;">${politica}</strong>
+                        </div>
+                        <div style="padding-left: 18px; font-size: 9px; color: #6b7280; line-height: 1.3;">
+                            ${ugas.join(', ')}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            legendItems.innerHTML = legendHTML;
+            
+            console.log('✓ Análisis espacial de POEL completado');
+        }
+
+        function renderSocioecosistema(data) {
+            data.forEach(item => {
+                const geom = parseGeometry(item);
+                if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+
+                const tipo = item.Tipo_sist || 'default';
+                const color = getSocioEcoColor(tipo);
+
+                const coords = parseGeoJSON(geom);
+                if (coords && coords.length > 0) {
+                    const polygon = L.polygon(coords, {
+                        color: color,
+                        fillColor: color,
+                        fillOpacity: 0.4,
+                        weight: 2,
+                        opacity: 0.8
+                    });
+
+                    const popupContent = `
+                        <div class="custom-popup">
+                            <h3 style="color: ${color};">Socioecosistema</h3>
+                            <div class="custom-popup-divider" style="border-color: ${color};">
+                                <p><strong>Tipo:</strong> ${tipo}</p>
+                                <p><strong>Hectáreas:</strong> ${(item.ha || 0).toLocaleString()}</p>
+                            </div>
+                        </div>
+                    `;
+
+                    polygon.bindPopup(popupContent);
+                    
+                    polygon.on('mouseover', function() {
+                        this.setStyle({ fillOpacity: 0.6, weight: 3 });
+                    });
+                    polygon.on('mouseout', function() {
+                        this.setStyle({ fillOpacity: 0.4, weight: 2 });
+                    });
+
+                    polygon.addTo(layerGroups.socioeco);
+                }
+            });
+        }
+
+        function renderMunicipio(data) {
+            data.forEach(item => {
+                const geom = parseGeometry(item);
+                if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+
+                const coords = parseGeoJSON(geom);
+                if (coords && coords.length > 0) {
+                    const polygon = L.polygon(coords, {
+                        color: '#fbbf24',
+                        fillColor: COLORS.municipio,
+                        fillOpacity: 0.05,
+                        weight: 4,
+                        opacity: 1
+                    });
+
+                    const popupContent = `
+                        <div class="custom-popup">
+                            <h3 style="color: ${COLORS.municipio};">Municipio Puerto Morelos</h3>
+                            <div class="custom-popup-divider" style="border-color: ${COLORS.municipio};">
+                                <p><strong>Límite municipal</strong></p>
+                            </div>
+                        </div>
+                    `;
+
+                    polygon.bindPopup(popupContent);
+                    polygon.addTo(layerGroups.municipio);
+                }
+            });
+        }
+
+        // Controles de capas
+        document.getElementById('layer-proyectos').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.proyectos);
+            else map.removeLayer(layerGroups.proyectos);
+        });
+
+        document.getElementById('layer-descargas').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.descargas);
+            else map.removeLayer(layerGroups.descargas);
+        });
+
+        document.getElementById('layer-extracciones').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.extracciones);
+            else map.removeLayer(layerGroups.extracciones);
+        });
+
+        document.getElementById('layer-cuerpos-agua').addEventListener('change', (e) => {
+            if (e.target.checked) {
+                map.addLayer(layerGroups.cuerposAgua);
+            } else {
+                map.removeLayer(layerGroups.cuerposAgua);
+            }
+            // Sincronizar sub-checkboxes
+            const subCheckboxes = ['layer-piscinas', 'layer-cenotes-sup', 'layer-cenotes-sub', 
+                                    'layer-aguadas-art', 'layer-aguadas-nat', 'layer-sascab', 'layer-rios'];
+            subCheckboxes.forEach(id => {
+                document.getElementById(id).checked = e.target.checked;
+                document.getElementById(id).dispatchEvent(new Event('change'));
+            });
+        });
+
+        document.getElementById('layer-piscinas').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.piscinas);
+            else map.removeLayer(layerGroups.piscinas);
+        });
+
+        document.getElementById('layer-cenotes-sup').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.cenotesSup);
+            else map.removeLayer(layerGroups.cenotesSup);
+        });
+
+        document.getElementById('layer-cenotes-sub').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.cenotesSub);
+            else map.removeLayer(layerGroups.cenotesSub);
+        });
+
+        document.getElementById('layer-aguadas-art').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.aguadasArt);
+            else map.removeLayer(layerGroups.aguadasArt);
+        });
+
+        document.getElementById('layer-aguadas-nat').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.aguadasNat);
+            else map.removeLayer(layerGroups.aguadasNat);
+        });
+
+        document.getElementById('layer-sascab').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.sascab);
+            else map.removeLayer(layerGroups.sascab);
+        });
+
+        document.getElementById('layer-rios').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.rios);
+            else map.removeLayer(layerGroups.rios);
+        });
+
+        document.getElementById('layer-karstificacion').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.karstificacion);
+            else map.removeLayer(layerGroups.karstificacion);
+        });
+
+        document.getElementById('layer-fallas-inegi').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.fallasINEGI);
+            else map.removeLayer(layerGroups.fallasINEGI);
+        });
+
+        document.getElementById('layer-fallas-cenapred').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.fallasCENAPRED);
+            else map.removeLayer(layerGroups.fallasCENAPRED);
+        });
+
+        document.getElementById('layer-poel').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.poel);
+            else map.removeLayer(layerGroups.poel);
+        });
+
+        document.getElementById('layer-socioeco').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.socioeco);
+            else map.removeLayer(layerGroups.socioeco);
+        });
+
+        document.getElementById('layer-municipio').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.municipio);
+            else map.removeLayer(layerGroups.municipio);
+        });
+
+        // Función para minimizar/maximizar paneles
+        function togglePanel(panelId) {
+            const panel = document.getElementById(panelId);
+            const icon = document.getElementById(panelId === 'control-panel' ? 'control-toggle-icon' : 'legends-toggle-icon');
+            
+            if (panel.classList.contains('panel-minimized')) {
+                panel.classList.remove('panel-minimized');
+                icon.textContent = '−';
+            } else {
+                panel.classList.add('panel-minimized');
+                icon.textContent = '+';
+            }
+        }
+
+        function toggleAllLayers() {
+            const checkboxes = document.querySelectorAll('.layer-control input[type="checkbox"]');
+            const firstChecked = checkboxes[0].checked;
+            checkboxes.forEach(cb => {
+                cb.checked = !firstChecked;
+                cb.dispatchEvent(new Event('change'));
+            });
+        }
+
+        // Iniciar al cargar
+        window.addEventListener('load', async () => {
+            // Función para esperar a que las librerías estén disponibles
+            async function waitForLibraries() {
+                let attempts = 0;
+                const maxAttempts = 100; // 10 segundos máximo (era 5)
+                
+                console.log('[INFO] Esperando a que se carguen Leaflet y Supabase...');
+                
+                while (attempts < maxAttempts) {
+                    const leafletLoaded = typeof L !== 'undefined';
+                    const supabaseLoaded = typeof supabase !== 'undefined';
+                    
+                    if (attempts % 10 === 0) { // Log cada segundo
+                        console.log(`[CHECK] Intento ${attempts}: Leaflet=${leafletLoaded}, Supabase=${supabaseLoaded}`);
+                    }
+                    
+                    if (leafletLoaded && supabaseLoaded) {
+                        console.log('[SUCCESS] ✓ Librerías cargadas correctamente');
+                        return true;
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    attempts++;
+                }
+                
+                // Si llegamos aquí, hubo timeout
+                const leafletLoaded = typeof L !== 'undefined';
+                const supabaseLoaded = typeof supabase !== 'undefined';
+                console.error(`[TIMEOUT] Leaflet: ${leafletLoaded}, Supabase: ${supabaseLoaded}`);
+                throw new Error('Timeout esperando librerías');
+            }
+            
+            try {
+                // Esperar a que Leaflet y Supabase estén disponibles
+                await waitForLibraries();
+                
+                // Ahora sí inicializar Supabase
+                const { createClient } = supabase;
+                supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
+                console.log('[STATUS] Supabase inicializado correctamente');
+                
+                // Inicializar funcionalidad de arrastre para paneles
+                setupDraggable();
+            } catch (error) {
+                console.error('[ERROR] Error cargando librerías:', error);
+                
+                // Mostrar mensaje al usuario
+                const modal = document.getElementById('welcome-modal');
+                if (modal) {
+                    modal.innerHTML = `
+                        <div class="welcome-content" style="text-align: center;">
+                            <h2 style="color: #ef4444;">⚠️ Error de Carga</h2>
+                            <p style="margin: 20px 0;">No se pudieron cargar las librerías necesarias.</p>
+                            <p style="margin: 20px 0;">Posibles causas:</p>
+                            <ul style="text-align: left; margin: 20px auto; max-width: 400px;">
+                                <li>Problemas de conexión a Internet</li>
+                                <li>CDNs bloqueados por firewall/antivirus</li>
+                                <li>Extensiones del navegador bloqueando scripts</li>
+                            </ul>
+                            <button onclick="location.reload()" style="
+                                background: #3b82f6;
+                                color: white;
+                                border: none;
+                                padding: 12px 24px;
+                                border-radius: 8px;
+                                cursor: pointer;
+                                font-size: 16px;
+                                margin-top: 20px;
+                            ">
+                                🔄 Recargar Página
+                            </button>
+                        </div>
+                    `;
+                    modal.style.display = 'flex';
+                }
+                return;
+            }
+
+            // Primero inicializar el mapa
+            await initMap();
+            
+            // Luego cargar proyectos colaborativos (pueden no haber si no hay auth)
+            try {
+                await loadCollaborativeProjects();
+            } catch (e) {
+                console.log('No se pudieron cargar proyectos colaborativos:', e);
+            }
+            
+            // Finalmente verificar estado de autenticación
+            await checkAuthState();
+
+            // ======== EVENT LISTENERS (después de inicializar todo) ========
+
+            // Mostrar modales
+            document.getElementById('show-login-btn').addEventListener('click', () => {
+                document.getElementById('login-modal').style.display = 'flex';
+                document.getElementById('login-error').style.display = 'none';
+            });
+
+            document.getElementById('show-register-btn').addEventListener('click', () => {
+                document.getElementById('register-modal').style.display = 'flex';
+                document.getElementById('register-error').style.display = 'none';
+                document.getElementById('register-success').style.display = 'none';
+            });
+
+            document.getElementById('add-project-btn').addEventListener('click', () => {
+                document.getElementById('add-project-modal').style.display = 'flex';
+                document.getElementById('add-project-error').style.display = 'none';
+                document.getElementById('add-project-success').style.display = 'none';
+            });
+
+            // Cerrar modales
+            document.getElementById('close-login-modal').addEventListener('click', () => {
+                document.getElementById('login-modal').style.display = 'none';
+            });
+
+            document.getElementById('close-register-modal').addEventListener('click', () => {
+                document.getElementById('register-modal').style.display = 'none';
+            });
+
+            document.getElementById('close-add-project-modal').addEventListener('click', () => {
+                document.getElementById('add-project-modal').style.display = 'none';
+                if (mapClickEnabled) {
+                    mapClickEnabled = false;
+                    map.getContainer().style.cursor = '';
+                    if (tempMarker) {
+                        map.removeLayer(tempMarker);
+                        tempMarker = null;
+                    }
+                }
+            });
+
+            // Formulario de login
+            document.getElementById('login-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const email = document.getElementById('login-email').value;
+                const password = document.getElementById('login-password').value;
+                const errorDiv = document.getElementById('login-error');
+
+                try {
+                    await handleLogin(email, password);
+                    document.getElementById('login-form').reset();
+                } catch (error) {
+                    errorDiv.textContent = error.message || 'Error al iniciar sesión';
+                    errorDiv.style.display = 'block';
+                }
+            });
+
+            // Formulario de registro
+            document.getElementById('register-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const username = document.getElementById('register-username').value;
+                const email = document.getElementById('register-email').value;
+                const password = document.getElementById('register-password').value;
+                const errorDiv = document.getElementById('register-error');
+                const successDiv = document.getElementById('register-success');
+
+                try {
+                    await handleRegister(username, email, password);
+                    successDiv.textContent = '¡Cuenta creada! Revisa tu email para confirmar tu cuenta.';
+                    successDiv.style.display = 'block';
+                    errorDiv.style.display = 'none';
+                    document.getElementById('register-form').reset();
+                    
+                    setTimeout(() => {
+                        document.getElementById('register-modal').style.display = 'none';
+                        document.getElementById('login-modal').style.display = 'flex';
+                    }, 3000);
+                } catch (error) {
+                    errorDiv.textContent = error.message || 'Error al registrarse';
+                    errorDiv.style.display = 'block';
+                    successDiv.style.display = 'none';
+                }
+            });
+
+            // Cerrar sesión
+            document.getElementById('logout-btn').addEventListener('click', async () => {
+                if (confirm('¿Seguro que quieres cerrar sesión?')) {
+                    await handleLogout();
+                }
+            });
+
+            // Formulario de agregar proyecto
+            document.getElementById('add-project-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const errorDiv = document.getElementById('add-project-error');
+                const successDiv = document.getElementById('add-project-success');
+
+                const projectData = {
+                    nombre: document.getElementById('project-nombre').value,
+                    descripcion: document.getElementById('project-descripcion').value,
+                    mia: document.getElementById('project-mia').value,
+                    irregularidad: document.getElementById('project-irregularidad').value,
+                    lat: parseFloat(document.getElementById('project-lat').value),
+                    lng: parseFloat(document.getElementById('project-lng').value)
+                };
+
+                try {
+                    await addProjectToMap(projectData);
+                    successDiv.textContent = '✓ Proyecto agregado exitosamente';
+                    successDiv.style.display = 'block';
+                    errorDiv.style.display = 'none';
+                    document.getElementById('add-project-form').reset();
+                    
+                    if (tempMarker) {
+                        map.removeLayer(tempMarker);
+                        tempMarker = null;
+                    }
+                    
+                    setTimeout(() => {
+                        document.getElementById('add-project-modal').style.display = 'none';
+                        successDiv.style.display = 'none';
+                    }, 2000);
+                } catch (error) {
+                    errorDiv.textContent = error.message || 'Error al agregar proyecto';
+                    errorDiv.style.display = 'block';
+                    successDiv.style.display = 'none';
+                }
+            });
+
+            // Activar click en mapa
+            document.getElementById('enable-map-click').addEventListener('click', () => {
+                mapClickEnabled = !mapClickEnabled;
+                const btn = document.getElementById('enable-map-click');
+                
+                if (mapClickEnabled) {
+                    btn.textContent = '✓ Click Activado - Haz click en el mapa';
+                    btn.style.background = '#10b981';
+                    map.getContainer().style.cursor = 'crosshair';
+                } else {
+                    btn.textContent = '📍 Activar Click en Mapa';
+                    btn.style.background = '#3b82f6';
+                    map.getContainer().style.cursor = '';
+                    if (tempMarker) {
+                        map.removeLayer(tempMarker);
+                        tempMarker = null;
+                    }
+                }
+            });
+
+            // Control de capa de proyectos colaborativos
+            document.getElementById('layer-proyectos-colab').addEventListener('change', (e) => {
+                if (e.target.checked) map.addLayer(layerGroups.proyectosColab);
+                else map.removeLayer(layerGroups.proyectosColab);
+            });
+        });
+    </script>
+</body>
+</html>
