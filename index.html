@@ -1957,12 +1957,8 @@
                         document.getElementById('enable-map-click').style.background = '#10b981';
                         map.getContainer().style.cursor = '';
                         
-                        // Restaurar el modal
-                        const modal = document.getElementById('add-project-modal').querySelector('div');
-                        modal.style.transform = 'scale(1)';
-                        modal.style.opacity = '1';
-                        modal.style.position = 'static';
-                        modal.style.maxWidth = '500px';
+                        // Mostrar el modal de nuevo
+                        document.getElementById('add-project-modal').style.display = 'flex';
                         
                         setTimeout(() => {
                             document.getElementById('enable-map-click').textContent = '📍 Activar Click en Mapa';
@@ -3493,32 +3489,22 @@
             document.getElementById('enable-map-click').addEventListener('click', () => {
                 mapClickEnabled = !mapClickEnabled;
                 const btn = document.getElementById('enable-map-click');
-                const modal = document.getElementById('add-project-modal').querySelector('div');
+                const modal = document.getElementById('add-project-modal');
                 
                 if (mapClickEnabled) {
                     btn.textContent = '✓ Click Activado - Haz click en el mapa';
                     btn.style.background = '#10b981';
                     map.getContainer().style.cursor = 'crosshair';
                     
-                    // Minimizar el modal
-                    modal.style.transform = 'scale(0.3)';
-                    modal.style.transformOrigin = 'top left';
-                    modal.style.opacity = '0.5';
-                    modal.style.transition = 'all 0.3s ease';
-                    modal.style.position = 'fixed';
-                    modal.style.top = '20px';
-                    modal.style.left = '20px';
-                    modal.style.maxWidth = '150px';
+                    // Ocultar el modal temporalmente
+                    modal.style.display = 'none';
                 } else {
                     btn.textContent = '📍 Activar Click en Mapa';
                     btn.style.background = '#3b82f6';
                     map.getContainer().style.cursor = '';
                     
-                    // Restaurar el modal
-                    modal.style.transform = 'scale(1)';
-                    modal.style.opacity = '1';
-                    modal.style.position = 'static';
-                    modal.style.maxWidth = '500px';
+                    // Mostrar el modal de nuevo
+                    modal.style.display = 'flex';
                     
                     if (tempMarker) {
                         map.removeLayer(tempMarker);
