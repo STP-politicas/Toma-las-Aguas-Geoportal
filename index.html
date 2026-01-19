@@ -253,6 +253,8 @@
         .custom-popup {
             padding: 15px;
             font-family: 'Segoe UI', sans-serif;
+            max-width: 100%;
+            box-sizing: border-box;
         }
 
         .custom-popup h3 {
@@ -260,6 +262,8 @@
             font-size: 16px;
             text-transform: none;
             letter-spacing: normal;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
         .custom-popup-divider {
@@ -272,10 +276,47 @@
             margin: 8px 0;
             color: #374151;
             font-size: 13px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            word-break: break-word;
+            max-width: 100%;
+            line-height: 1.5;
         }
 
         .custom-popup strong {
             color: #1f2937;
+        }
+
+        .custom-popup a {
+            word-break: break-all;
+            overflow-wrap: break-word;
+            display: inline-block;
+            max-width: 100%;
+        }
+
+        /* Estilos globales para todos los popups de Leaflet */
+        .leaflet-popup-content-wrapper {
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        .leaflet-popup-content {
+            margin: 0 !important;
+            overflow: hidden;
+            width: 100% !important;
+            box-sizing: border-box;
+        }
+
+        /* Popup específico de proyectos colaborativos */
+        .collaborative-project-popup .leaflet-popup-content-wrapper {
+            min-width: 300px;
+            max-width: 400px;
+            overflow: hidden;
+        }
+
+        .collaborative-project-popup .leaflet-popup-content {
+            overflow: hidden;
+            word-wrap: break-word;
         }
 
         /* ========== ESTILOS PARA MODAL DE BIENVENIDA ========== */
@@ -1615,7 +1656,11 @@
                     </div>
                 `;
 
-                marker.bindPopup(popupContent);
+                marker.bindPopup(popupContent, {
+                    maxWidth: 400,
+                    minWidth: 300,
+                    className: 'collaborative-project-popup'
+                });
                 
                 // Guardar referencia al item en el marcador para poder actualizarlo
                 marker.projectId = item.id;
