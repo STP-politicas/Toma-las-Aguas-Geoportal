@@ -649,9 +649,12 @@
         </div>
         
         <div id="user-section" style="margin: 10px 0; padding: 10px; background: #d1fae5; border-radius: 4px; border: 1px solid #10b981; display: none;">
-            <p style="font-size: 11px; color: #065f46; margin: 0 0 5px 0;">
+            <p style="font-size: 11px; color: #065f46; margin: 0 0 8px 0;">
                 👤 <strong id="username-display"></strong>
             </p>
+            <button id="export-csv-btn" style="width: 100%; padding: 6px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; margin-bottom: 5px; font-weight: 600;">
+                📊 Exportar Proyectos a CSV
+            </button>
             <button id="logout-btn" style="width: 100%; padding: 6px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;">
                 Cerrar Sesión
             </button>
@@ -963,12 +966,12 @@
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
                     <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568;">Latitud *</label>
-                        <input type="number" id="project-lat" required step="0.000001" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568;">Latitud</label>
+                        <input type="number" id="project-lat" step="0.000001" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;" placeholder="Opcional">
                     </div>
                     <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568;">Longitud *</label>
-                        <input type="number" id="project-lng" required step="0.000001" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568;">Longitud</label>
+                        <input type="number" id="project-lng" step="0.000001" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;" placeholder="Opcional">
                     </div>
                 </div>
                 <div style="padding: 12px; background: #eff6ff; border: 1px solid #3b82f6; border-radius: 6px; margin-bottom: 15px;">
@@ -993,7 +996,53 @@
         </div>
     </div>
 
-    <!-- Leaflet JS -->
+    <!-- Modal de Editar Proyecto -->
+    <div id="edit-project-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 30px; border-radius: 12px; max-width: 500px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-height: 90vh; overflow-y: auto;">
+            <h2 style="margin: 0 0 20px 0; color: #1f2937;">✏️ Editar Proyecto</h2>
+            <form id="edit-project-form">
+                <input type="hidden" id="edit-project-id">
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568;">Nombre del Proyecto *</label>
+                    <input type="text" id="edit-project-nombre" required style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568;">Descripción</label>
+                    <textarea id="edit-project-descripcion" rows="3" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; resize: vertical;"></textarea>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568;">MIA</label>
+                    <input type="text" id="edit-project-mia" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568;">¿Ilegalidad o irregularidad?</label>
+                    <input type="text" id="edit-project-irregularidad" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568;">Latitud</label>
+                        <input type="number" id="edit-project-lat" step="0.000001" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568;">Longitud</label>
+                        <input type="number" id="edit-project-lng" step="0.000001" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                    </div>
+                </div>
+                <div id="edit-project-error" style="display: none; padding: 10px; background: #fee; border: 1px solid #f88; border-radius: 6px; margin-bottom: 15px; color: #c00; font-size: 13px;"></div>
+                <div id="edit-project-success" style="display: none; padding: 10px; background: #d1fae5; border: 1px solid #10b981; border-radius: 6px; margin-bottom: 15px; color: #065f46; font-size: 13px;"></div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" style="flex: 1; padding: 12px; background: #f59e0b; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;">
+                        ✅ Actualizar Proyecto
+                    </button>
+                    <button type="button" id="close-edit-project-modal" style="flex: 1; padding: 12px; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <!-- Supabase JS -->
@@ -1447,6 +1496,8 @@
             // Limpiar capa existente
             layerGroups.proyectosColab.clearLayers();
             
+            const isAdmin = currentUser && currentUser.email === 'storresperdigon@politicas.unam.mx';
+            
             data.forEach(item => {
                 const marker = L.circleMarker([item.lat, item.lng], {
                     radius: 8,
@@ -1454,15 +1505,90 @@
                     color: '#ffffff',
                     weight: 2,
                     opacity: 0.9,
-                    fillOpacity: 0.9
+                    fillOpacity: 0.9,
+                    // Hacer el marcador arrastrable solo para el admin
+                    draggable: isAdmin
                 });
 
                 const isOwner = currentUser && item.user_id === currentUser.id;
                 const ownerBadge = isOwner ? '<span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600;">TU PROYECTO</span>' : '';
+                const adminBadge = isAdmin ? '<span style="background: #ef4444; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600;">ADMIN</span>' : '';
+                
+                // Botones para el dueño del proyecto
+                let ownerButtons = '';
+                if (isOwner && !isAdmin) {
+                    ownerButtons = `
+                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
+                            <button onclick="editProject('${item.id}')" style="
+                                width: 100%;
+                                padding: 8px 12px;
+                                background: #f59e0b;
+                                color: white;
+                                border: none;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                font-size: 12px;
+                                font-weight: 600;
+                            ">
+                                ✏️ Editar mi proyecto
+                            </button>
+                        </div>
+                    `;
+                }
+                
+                // Botones de admin
+                let adminButtons = '';
+                if (isAdmin) {
+                    adminButtons = `
+                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
+                            <p style="font-size: 11px; color: #6b7280; margin-bottom: 8px;">⚙️ Controles de Administrador</p>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;">
+                                <button onclick="editProject('${item.id}')" style="
+                                    padding: 6px 8px;
+                                    background: #f59e0b;
+                                    color: white;
+                                    border: none;
+                                    border-radius: 4px;
+                                    cursor: pointer;
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                ">
+                                    ✏️ Editar
+                                </button>
+                                <button onclick="moveProject('${item.id}', ${item.lat}, ${item.lng})" style="
+                                    padding: 6px 8px;
+                                    background: #3b82f6;
+                                    color: white;
+                                    border: none;
+                                    border-radius: 4px;
+                                    cursor: pointer;
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                ">
+                                    📍 Mover
+                                </button>
+                                <button onclick="deleteProject('${item.id}')" style="
+                                    padding: 6px 8px;
+                                    background: #ef4444;
+                                    color: white;
+                                    border: none;
+                                    border-radius: 4px;
+                                    cursor: pointer;
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                ">
+                                    🗑️ Borrar
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
                 
                 const popupContent = `
                     <div class="custom-popup">
-                        <h3 style="color: ${COLORS.proyectosColab};">Proyecto Colaborativo ${ownerBadge}</h3>
+                        <h3 style="color: ${COLORS.proyectosColab};">
+                            Proyecto Colaborativo ${ownerBadge} ${adminBadge}
+                        </h3>
                         <div class="custom-popup-divider" style="border-color: ${COLORS.proyectosColab};">
                             <p><strong>Nombre:</strong> ${item.nombre_proyecto}</p>
                             ${item.descripcion ? `<p><strong>Descripción:</strong> ${item.descripcion}</p>` : ''}
@@ -1470,15 +1596,219 @@
                             ${item.irregularidad ? `<p><strong>Irregularidad:</strong> ${item.irregularidad}</p>` : ''}
                             <p style="color: #6b7280; font-size: 12px; margin-top: 8px;">
                                 👤 Agregado por: <strong>${item.username}</strong><br>
-                                📅 ${new Date(item.created_at).toLocaleDateString('es-MX')}
+                                📅 ${new Date(item.created_at).toLocaleDateString('es-MX')}<br>
+                                📍 Lat: ${item.lat.toFixed(6)}, Lng: ${item.lng.toFixed(6)}
                             </p>
+                            ${ownerButtons}
+                            ${adminButtons}
                         </div>
                     </div>
                 `;
 
                 marker.bindPopup(popupContent);
+                
+                // Guardar referencia al item en el marcador para poder actualizarlo
+                marker.projectId = item.id;
+                marker.projectData = item;
+                
+                // Si es admin, permitir arrastrar el marcador (para mover proyecto)
+                if (isAdmin) {
+                    marker.on('dragend', async function(e) {
+                        const newLatLng = e.target.getLatLng();
+                        if (confirm('¿Mover este proyecto a la nueva ubicación?')) {
+                            try {
+                                await updateProjectLocation(item.id, newLatLng.lat, newLatLng.lng);
+                                alert('✅ Proyecto movido exitosamente');
+                                await loadCollaborativeProjects();
+                            } catch (error) {
+                                alert('❌ Error al mover proyecto: ' + error.message);
+                                e.target.setLatLng([item.lat, item.lng]); // Revertir posición
+                            }
+                        } else {
+                            e.target.setLatLng([item.lat, item.lng]); // Revertir posición
+                        }
+                    });
+                }
+                
                 marker.addTo(layerGroups.proyectosColab);
             });
+        }
+
+        // Funciones de administrador (solo para storresperdigon@politicas.unam.mx)
+        async function deleteProject(projectId) {
+            if (!currentUser || currentUser.email !== 'storresperdigon@politicas.unam.mx') {
+                alert('❌ No tienes permisos para eliminar proyectos');
+                return;
+            }
+            
+            if (!confirm('⚠️ ¿Estás seguro de que quieres eliminar este proyecto? Esta acción no se puede deshacer.')) {
+                return;
+            }
+            
+            try {
+                const { error } = await supabaseClient
+                    .from('proyectos_colaborativos')
+                    .delete()
+                    .eq('id', projectId);
+                
+                if (error) throw error;
+                
+                alert('✅ Proyecto eliminado exitosamente');
+                await loadCollaborativeProjects();
+            } catch (error) {
+                console.error('Error eliminando proyecto:', error);
+                alert('❌ Error al eliminar proyecto: ' + error.message);
+            }
+        }
+
+        async function moveProject(projectId, currentLat, currentLng) {
+            if (!currentUser || currentUser.email !== 'storresperdigon@politicas.unam.mx') {
+                alert('❌ No tienes permisos para mover proyectos');
+                return;
+            }
+            
+            const newLat = prompt('Nueva Latitud:', currentLat);
+            if (!newLat) return;
+            
+            const newLng = prompt('Nueva Longitud:', currentLng);
+            if (!newLng) return;
+            
+            try {
+                await updateProjectLocation(projectId, parseFloat(newLat), parseFloat(newLng));
+                alert('✅ Proyecto movido exitosamente');
+                await loadCollaborativeProjects();
+            } catch (error) {
+                console.error('Error moviendo proyecto:', error);
+                alert('❌ Error al mover proyecto: ' + error.message);
+            }
+        }
+
+        async function updateProjectLocation(projectId, newLat, newLng) {
+            const { error } = await supabaseClient
+                .from('proyectos_colaborativos')
+                .update({ 
+                    lat: newLat, 
+                    lng: newLng 
+                })
+                .eq('id', projectId);
+            
+            if (error) throw error;
+        }
+
+        async function editProject(projectId) {
+            // Verificar permisos
+            const project = await getProjectById(projectId);
+            if (!project) {
+                alert('❌ Proyecto no encontrado');
+                return;
+            }
+            
+            const isAdmin = currentUser && currentUser.email === 'storresperdigon@politicas.unam.mx';
+            const isOwner = currentUser && project.user_id === currentUser.id;
+            
+            if (!isAdmin && !isOwner) {
+                alert('❌ No tienes permisos para editar este proyecto');
+                return;
+            }
+            
+            // Cargar datos en el formulario
+            document.getElementById('edit-project-id').value = project.id;
+            document.getElementById('edit-project-nombre').value = project.nombre_proyecto;
+            document.getElementById('edit-project-descripcion').value = project.descripcion || '';
+            document.getElementById('edit-project-mia').value = project.mia || '';
+            document.getElementById('edit-project-irregularidad').value = project.irregularidad || '';
+            document.getElementById('edit-project-lat').value = project.lat;
+            document.getElementById('edit-project-lng').value = project.lng;
+            
+            // Mostrar modal
+            document.getElementById('edit-project-modal').style.display = 'flex';
+        }
+
+        async function getProjectById(projectId) {
+            const { data, error } = await supabaseClient
+                .from('proyectos_colaborativos')
+                .select('*')
+                .eq('id', projectId)
+                .single();
+            
+            if (error) {
+                console.error('Error obteniendo proyecto:', error);
+                return null;
+            }
+            
+            return data;
+        }
+
+        async function updateProject(projectId, projectData) {
+            const { error } = await supabaseClient
+                .from('proyectos_colaborativos')
+                .update({
+                    nombre_proyecto: projectData.nombre,
+                    descripcion: projectData.descripcion || null,
+                    mia: projectData.mia || null,
+                    irregularidad: projectData.irregularidad || null,
+                    lat: projectData.lat,
+                    lng: projectData.lng
+                })
+                .eq('id', projectId);
+            
+            if (error) throw error;
+        }
+
+        async function exportProjectsToCSV() {
+            try {
+                // Obtener todos los proyectos
+                const { data, error } = await supabaseClient
+                    .from('proyectos_colaborativos')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (error) throw error;
+                
+                if (!data || data.length === 0) {
+                    alert('❌ No hay proyectos para exportar');
+                    return;
+                }
+                
+                // Crear CSV
+                const headers = ['ID', 'Nombre', 'Descripción', 'MIA', 'Irregularidad', 'Latitud', 'Longitud', 'Usuario', 'Fecha de Creación'];
+                const csvRows = [headers.join(',')];
+                
+                data.forEach(project => {
+                    const row = [
+                        project.id,
+                        `"${(project.nombre_proyecto || '').replace(/"/g, '""')}"`,
+                        `"${(project.descripcion || '').replace(/"/g, '""')}"`,
+                        `"${(project.mia || '').replace(/"/g, '""')}"`,
+                        `"${(project.irregularidad || '').replace(/"/g, '""')}"`,
+                        project.lat,
+                        project.lng,
+                        `"${project.username || ''}"`,
+                        new Date(project.created_at).toLocaleString('es-MX')
+                    ];
+                    csvRows.push(row.join(','));
+                });
+                
+                const csvContent = csvRows.join('\n');
+                
+                // Crear y descargar archivo
+                const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                const fileName = `proyectos_colaborativos_${new Date().toISOString().split('T')[0]}.csv`;
+                
+                link.setAttribute('href', url);
+                link.setAttribute('download', fileName);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                alert(`✅ ${data.length} proyectos exportados exitosamente a ${fileName}`);
+            } catch (error) {
+                console.error('Error exportando proyectos:', error);
+                alert('❌ Error al exportar proyectos: ' + error.message);
+            }
         }
 
         // Función para verificar si un punto está dentro de un polígono
@@ -1626,6 +1956,13 @@
                         document.getElementById('enable-map-click').textContent = '✓ Coordenadas capturadas';
                         document.getElementById('enable-map-click').style.background = '#10b981';
                         map.getContainer().style.cursor = '';
+                        
+                        // Restaurar el modal
+                        const modal = document.getElementById('add-project-modal').querySelector('div');
+                        modal.style.transform = 'scale(1)';
+                        modal.style.opacity = '1';
+                        modal.style.position = 'static';
+                        modal.style.maxWidth = '500px';
                         
                         setTimeout(() => {
                             document.getElementById('enable-map-click').textContent = '📍 Activar Click en Mapa';
@@ -2999,6 +3336,10 @@
                 }
             });
 
+            document.getElementById('close-edit-project-modal').addEventListener('click', () => {
+                document.getElementById('edit-project-modal').style.display = 'none';
+            });
+
             // Formulario de login
             document.getElementById('login-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
@@ -3055,13 +3396,24 @@
                 const errorDiv = document.getElementById('add-project-error');
                 const successDiv = document.getElementById('add-project-success');
 
+                const lat = document.getElementById('project-lat').value;
+                const lng = document.getElementById('project-lng').value;
+                
+                // Validar que las coordenadas existan
+                if (!lat || !lng) {
+                    errorDiv.textContent = '⚠️ Por favor captura las coordenadas haciendo click en el mapa o ingrésalas manualmente';
+                    errorDiv.style.display = 'block';
+                    successDiv.style.display = 'none';
+                    return;
+                }
+
                 const projectData = {
                     nombre: document.getElementById('project-nombre').value,
                     descripcion: document.getElementById('project-descripcion').value,
                     mia: document.getElementById('project-mia').value,
                     irregularidad: document.getElementById('project-irregularidad').value,
-                    lat: parseFloat(document.getElementById('project-lat').value),
-                    lng: parseFloat(document.getElementById('project-lng').value)
+                    lat: parseFloat(lat),
+                    lng: parseFloat(lng)
                 };
 
                 try {
@@ -3087,19 +3439,87 @@
                 }
             });
 
+            // Formulario de editar proyecto
+            document.getElementById('edit-project-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const errorDiv = document.getElementById('edit-project-error');
+                const successDiv = document.getElementById('edit-project-success');
+
+                const projectId = document.getElementById('edit-project-id').value;
+                const lat = document.getElementById('edit-project-lat').value;
+                const lng = document.getElementById('edit-project-lng').value;
+                
+                // Validar que las coordenadas existan
+                if (!lat || !lng) {
+                    errorDiv.textContent = '⚠️ Por favor ingresa las coordenadas';
+                    errorDiv.style.display = 'block';
+                    successDiv.style.display = 'none';
+                    return;
+                }
+
+                const projectData = {
+                    nombre: document.getElementById('edit-project-nombre').value,
+                    descripcion: document.getElementById('edit-project-descripcion').value,
+                    mia: document.getElementById('edit-project-mia').value,
+                    irregularidad: document.getElementById('edit-project-irregularidad').value,
+                    lat: parseFloat(lat),
+                    lng: parseFloat(lng)
+                };
+
+                try {
+                    await updateProject(projectId, projectData);
+                    successDiv.textContent = '✅ Proyecto actualizado exitosamente';
+                    successDiv.style.display = 'block';
+                    errorDiv.style.display = 'none';
+                    
+                    setTimeout(async () => {
+                        document.getElementById('edit-project-modal').style.display = 'none';
+                        successDiv.style.display = 'none';
+                        await loadCollaborativeProjects();
+                    }, 2000);
+                } catch (error) {
+                    errorDiv.textContent = error.message || 'Error al actualizar proyecto';
+                    errorDiv.style.display = 'block';
+                    successDiv.style.display = 'none';
+                }
+            });
+
+            // Botón de exportar CSV
+            document.getElementById('export-csv-btn').addEventListener('click', async () => {
+                await exportProjectsToCSV();
+            });
+
             // Activar click en mapa
             document.getElementById('enable-map-click').addEventListener('click', () => {
                 mapClickEnabled = !mapClickEnabled;
                 const btn = document.getElementById('enable-map-click');
+                const modal = document.getElementById('add-project-modal').querySelector('div');
                 
                 if (mapClickEnabled) {
                     btn.textContent = '✓ Click Activado - Haz click en el mapa';
                     btn.style.background = '#10b981';
                     map.getContainer().style.cursor = 'crosshair';
+                    
+                    // Minimizar el modal
+                    modal.style.transform = 'scale(0.3)';
+                    modal.style.transformOrigin = 'top left';
+                    modal.style.opacity = '0.5';
+                    modal.style.transition = 'all 0.3s ease';
+                    modal.style.position = 'fixed';
+                    modal.style.top = '20px';
+                    modal.style.left = '20px';
+                    modal.style.maxWidth = '150px';
                 } else {
                     btn.textContent = '📍 Activar Click en Mapa';
                     btn.style.background = '#3b82f6';
                     map.getContainer().style.cursor = '';
+                    
+                    // Restaurar el modal
+                    modal.style.transform = 'scale(1)';
+                    modal.style.opacity = '1';
+                    modal.style.position = 'static';
+                    modal.style.maxWidth = '500px';
+                    
                     if (tempMarker) {
                         map.removeLayer(tempMarker);
                         tempMarker = null;
