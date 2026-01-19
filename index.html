@@ -1043,11 +1043,11 @@
     </div>
 
     <!-- Indicador flotante para modo de captura de coordenadas -->
-    <div id="map-click-indicator" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10001; background: rgba(147, 51, 234, 0.95); color: white; padding: 30px 40px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); text-align: center; backdrop-filter: blur(10px); pointer-events: none;">
-        <div style="font-size: 48px; margin-bottom: 15px;">🎯</div>
-        <h3 style="margin: 0 0 10px 0; font-size: 20px;">Modo Captura Activado</h3>
-        <p style="margin: 0 0 20px 0; font-size: 14px; opacity: 0.9;">Haz click en el mapa para seleccionar la ubicación del proyecto</p>
-        <button id="cancel-map-click" style="padding: 10px 24px; background: white; color: #9333ea; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; pointer-events: auto;">
+    <div id="map-click-indicator" style="display: none; position: fixed; top: 100px; right: 20px; z-index: 10001; background: rgba(147, 51, 234, 0.95); color: white; padding: 20px 25px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); text-align: center; backdrop-filter: blur(10px); pointer-events: none; max-width: 280px;">
+        <div style="font-size: 32px; margin-bottom: 10px;">🎯</div>
+        <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 700;">Modo Captura Activado</h3>
+        <p style="margin: 0 0 15px 0; font-size: 12px; opacity: 0.9; line-height: 1.4;">Haz click en el mapa para seleccionar la ubicación</p>
+        <button id="cancel-map-click" style="padding: 8px 20px; background: white; color: #9333ea; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; pointer-events: auto;">
             ❌ Cancelar
         </button>
     </div>
@@ -1627,9 +1627,15 @@
                         const newLatLng = e.target.getLatLng();
                         if (confirm('¿Mover este proyecto a la nueva ubicación?')) {
                             try {
+                                // Cerrar popup
+                                map.closePopup();
+                                
                                 await updateProjectLocation(item.id, newLatLng.lat, newLatLng.lng);
-                                alert('✅ Proyecto movido exitosamente');
+                                
+                                // Recargar proyectos inmediatamente
                                 await loadCollaborativeProjects();
+                                
+                                alert('✅ Proyecto movido exitosamente');
                             } catch (error) {
                                 alert('❌ Error al mover proyecto: ' + error.message);
                                 e.target.setLatLng([item.lat, item.lng]); // Revertir posición
@@ -1656,6 +1662,9 @@
             }
             
             try {
+                // Cerrar cualquier popup abierto
+                map.closePopup();
+                
                 const { error } = await supabaseClient
                     .from('proyectos_colaborativos')
                     .delete()
@@ -1663,8 +1672,10 @@
                 
                 if (error) throw error;
                 
-                alert('✅ Proyecto eliminado exitosamente');
+                // Recargar proyectos inmediatamente
                 await loadCollaborativeProjects();
+                
+                alert('✅ Proyecto eliminado exitosamente');
             } catch (error) {
                 console.error('Error eliminando proyecto:', error);
                 alert('❌ Error al eliminar proyecto: ' + error.message);
@@ -1684,9 +1695,15 @@
             if (!newLng) return;
             
             try {
+                // Cerrar cualquier popup abierto
+                map.closePopup();
+                
                 await updateProjectLocation(projectId, parseFloat(newLat), parseFloat(newLng));
-                alert('✅ Proyecto movido exitosamente');
+                
+                // Recargar proyectos inmediatamente
                 await loadCollaborativeProjects();
+                
+                alert('✅ Proyecto movido exitosamente');
             } catch (error) {
                 console.error('Error moviendo proyecto:', error);
                 alert('❌ Error al mover proyecto: ' + error.message);
@@ -1964,6 +1981,15 @@
                         // Desactivar modo click
                         mapClickEnabled = false;
                         map.getContainer().style.cursor = '';
+                        
+                        // Reactivar clicks en los layers
+                        map.eachLayer((layer) => {
+                            if (layer._originalClickEvent && layer.getPopup) {
+                                layer.on('click', function() {
+                                    this.openPopup();
+                                });
+                            }
+                        });
                         
                         // Ocultar indicador y mostrar modal
                         document.getElementById('map-click-indicator').style.display = 'none';
@@ -3513,6 +3539,17 @@
                     btn.style.background = '#10b981';
                     map.getContainer().style.cursor = 'crosshair';
                     
+                    // Cerrar cualquier popup abierto
+                    map.closePopup();
+                    
+                    // Desactivar clicks en todos los layers temporalmente
+                    map.eachLayer((layer) => {
+                        if (layer.getPopup) {
+                            layer._originalClickEvent = layer.listens('click');
+                            layer.off('click');
+                        }
+                    });
+                    
                     // Ocultar el modal y mostrar el indicador
                     modal.style.display = 'none';
                     indicator.style.display = 'block';
@@ -3520,6 +3557,15 @@
                     btn.textContent = '📍 Activar Click en Mapa';
                     btn.style.background = '#3b82f6';
                     map.getContainer().style.cursor = '';
+                    
+                    // Reactivar clicks en los layers
+                    map.eachLayer((layer) => {
+                        if (layer._originalClickEvent && layer.getPopup) {
+                            layer.on('click', function() {
+                                this.openPopup();
+                            });
+                        }
+                    });
                     
                     // Mostrar el modal y ocultar el indicador
                     modal.style.display = 'flex';
@@ -3536,6 +3582,16 @@
             document.getElementById('cancel-map-click').addEventListener('click', () => {
                 mapClickEnabled = false;
                 map.getContainer().style.cursor = '';
+                
+                // Reactivar clicks en los layers
+                map.eachLayer((layer) => {
+                    if (layer._originalClickEvent && layer.getPopup) {
+                        layer.on('click', function() {
+                            this.openPopup();
+                        });
+                    }
+                });
+                
                 document.getElementById('map-click-indicator').style.display = 'none';
                 document.getElementById('add-project-modal').style.display = 'flex';
                 document.getElementById('enable-map-click').textContent = '📍 Activar Click en Mapa';
