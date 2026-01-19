@@ -1241,9 +1241,26 @@
 
         async function checkAuthState() {
             try {
-                const { data: { session } } = await supabaseClient.auth.getSession();
+                // Detectar si venimos de un link de confirmación
+                const hash = window.location.hash;
+                const hasAuthToken = hash && (hash.includes('access_token') || hash.includes('type=signup'));
+                
+                if (hasAuthToken) {
+                    console.log('🔑 Detectado token de confirmación en URL, procesando...');
+                    // Esperar un momento para que Supabase procese el hash
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+                
+                const { data: { session }, error } = await supabaseClient.auth.getSession();
+                
+                if (error) {
+                    console.error('Error obteniendo sesión:', error);
+                    showLoginSection();
+                    return;
+                }
                 
                 if (session) {
+                    console.log('✅ Sesión activa encontrada');
                     currentUser = session.user;
                     const { data: profile } = await supabaseClient
                         .from('proyectos_colaborativos')
@@ -1253,7 +1270,22 @@
                     
                     const username = profile?.username || currentUser.email.split('@')[0];
                     showUserSection(username);
+                    
+                    // Cargar proyectos colaborativos
+                    await loadCollaborativeProjects();
+                    
+                    // Limpiar el hash de la URL después de procesar
+                    if (hash) {
+                        console.log('🧹 Limpiando URL...');
+                        window.history.replaceState(null, '', window.location.pathname);
+                    }
+                    
+                    // Mostrar mensaje de bienvenida si es confirmación
+                    if (hasAuthToken) {
+                        alert('✅ Email confirmado correctamente. ¡Bienvenido al geoportal!');
+                    }
                 } else {
+                    console.log('❌ No hay sesión activa');
                     currentUser = null;
                     showLoginSection();
                 }
@@ -1261,6 +1293,38 @@
                 console.error('Error verificando autenticación:', error);
                 showLoginSection();
             }
+        }
+        
+        // Escuchar cambios de autenticación (incluye confirmación de email)
+        function setupAuthListener() {
+            supabaseClient.auth.onAuthStateChange(async (event, session) => {
+                console.log('📢 Auth event:', event);
+                
+                if (event === 'SIGNED_IN') {
+                    console.log('✅ Usuario inició sesión');
+                    if (session) {
+                        currentUser = session.user;
+                        const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+                        showUserSection(username);
+                        await loadCollaborativeProjects();
+                    }
+                } else if (event === 'USER_UPDATED') {
+                    console.log('🔄 Usuario actualizado');
+                    if (session) {
+                        currentUser = session.user;
+                        const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
+                        showUserSection(username);
+                    }
+                } else if (event === 'SIGNED_OUT') {
+                    console.log('👋 Usuario cerró sesión');
+                    currentUser = null;
+                    showLoginSection();
+                    layerGroups.proyectosColab.clearLayers();
+                    updateLayerCount('proyectos-colab', 0);
+                } else if (event === 'TOKEN_REFRESHED') {
+                    console.log('🔄 Token actualizado');
+                }
+            });
         }
 
         function showLoginSection() {
@@ -1361,7 +1425,7 @@
                     .order('created_at', { ascending: false });
 
                 if (error) {
-                    console.warn('Tabla de proyectos colaborativos no disponible:', error.message);
+                    console.warn('Tabla de proyectos colaborativos no disponible:', error.message || 'Error desconocido');
                     return;
                 }
 
@@ -1374,7 +1438,7 @@
                     console.log('No hay proyectos colaborativos todavía');
                 }
             } catch (e) {
-                console.warn('Error cargando proyectos colaborativos:', e.message);
+                console.warn('Error cargando proyectos colaborativos:', e.message || String(e));
                 updateLayerCount('proyectos-colab', 0);
             }
         }
@@ -2890,6 +2954,9 @@
             
             // Finalmente verificar estado de autenticación
             await checkAuthState();
+            
+            // Configurar listener para cambios de autenticación (incluye confirmación de email)
+            setupAuthListener();
 
             // ======== EVENT LISTENERS (después de inicializar todo) ========
 
