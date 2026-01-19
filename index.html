@@ -1043,11 +1043,11 @@
     </div>
 
     <!-- Indicador flotante para modo de captura de coordenadas -->
-    <div id="map-click-indicator" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10001; background: rgba(147, 51, 234, 0.95); color: white; padding: 30px 40px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); text-align: center; backdrop-filter: blur(10px);">
+    <div id="map-click-indicator" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10001; background: rgba(147, 51, 234, 0.95); color: white; padding: 30px 40px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); text-align: center; backdrop-filter: blur(10px); pointer-events: none;">
         <div style="font-size: 48px; margin-bottom: 15px;">🎯</div>
         <h3 style="margin: 0 0 10px 0; font-size: 20px;">Modo Captura Activado</h3>
         <p style="margin: 0 0 20px 0; font-size: 14px; opacity: 0.9;">Haz click en el mapa para seleccionar la ubicación del proyecto</p>
-        <button id="cancel-map-click" style="padding: 10px 24px; background: white; color: #9333ea; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;">
+        <button id="cancel-map-click" style="padding: 10px 24px; background: white; color: #9333ea; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; pointer-events: auto;">
             ❌ Cancelar
         </button>
     </div>
