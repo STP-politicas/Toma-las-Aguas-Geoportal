@@ -2,7 +2,10 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#3b82f6">
     <title>Geoportal de Toma las Aguas</title>
     
     <!-- Leaflet CSS -->
@@ -519,6 +522,273 @@
 
         .control-panel, .legends-panel {
             transition: box-shadow 0.3s;
+        }
+
+        /* ========== RESPONSIVE DESIGN PARA MÓVILES ========== */
+        @media (max-width: 768px) {
+            /* Ajustar paneles laterales en móvil */
+            .control-panel, .legends-panel {
+                max-width: calc(100vw - 40px);
+                max-height: calc(100vh - 100px);
+                width: calc(100vw - 40px);
+                font-size: 14px;
+            }
+
+            /* Hacer el control panel más compacto */
+            .control-panel {
+                padding: 15px;
+                top: 10px;
+                left: 10px;
+            }
+
+            /* Panel de leyendas */
+            .legends-panel {
+                right: 10px;
+                top: 10px;
+                max-width: calc(100vw - 40px);
+            }
+
+            /* Ajustar tamaño de botones para touch */
+            .layer-control {
+                padding: 10px 12px;
+                min-height: 44px; /* Tamaño mínimo recomendado para touch */
+            }
+
+            .layer-control input[type="checkbox"] {
+                width: 20px;
+                height: 20px;
+            }
+
+            /* Ajustar controles de capas */
+            .control-panel h3 {
+                font-size: 15px;
+                margin: 15px 0 10px 0;
+            }
+
+            /* Hacer los botones más grandes para móvil */
+            button {
+                min-height: 44px;
+                font-size: 14px !important;
+                padding: 10px 15px !important;
+            }
+
+            /* Modal de agregar/editar proyecto responsive */
+            #add-project-modal > div,
+            #edit-project-modal > div {
+                width: 95% !important;
+                max-width: 95% !important;
+                padding: 20px !important;
+                margin: 10px;
+                max-height: 90vh !important;
+            }
+
+            /* Inputs más grandes en móvil */
+            input, textarea, select {
+                font-size: 16px !important; /* Evita zoom automático en iOS */
+                padding: 12px !important;
+                min-height: 44px;
+            }
+
+            /* Ajustar grid de coordenadas */
+            #add-project-modal input[type="number"],
+            #edit-project-modal input[type="number"] {
+                font-size: 14px !important;
+            }
+
+            /* Popups más pequeños en móvil */
+            .leaflet-popup-content-wrapper {
+                max-width: calc(100vw - 60px) !important;
+            }
+
+            .collaborative-project-popup .leaflet-popup-content-wrapper {
+                min-width: auto !important;
+                max-width: calc(100vw - 60px) !important;
+            }
+
+            .custom-popup {
+                font-size: 12px;
+                padding: 12px;
+            }
+
+            .custom-popup h3 {
+                font-size: 14px;
+                margin-bottom: 10px;
+            }
+
+            .custom-popup p {
+                font-size: 12px;
+                margin: 6px 0;
+            }
+
+            .custom-popup button {
+                font-size: 11px !important;
+                padding: 6px 10px !important;
+                min-height: 36px !important;
+            }
+
+            /* Indicador de captura de coordenadas en móvil */
+            #map-click-indicator {
+                top: 80px;
+                right: 10px;
+                left: 10px;
+                max-width: calc(100vw - 20px);
+                padding: 15px;
+            }
+
+            #map-click-indicator h3 {
+                font-size: 14px;
+            }
+
+            #map-click-indicator p {
+                font-size: 11px;
+            }
+
+            /* Ajustar panel de usuario */
+            #user-section {
+                font-size: 11px;
+            }
+
+            #user-section button {
+                font-size: 11px !important;
+                padding: 8px !important;
+                min-height: 40px;
+            }
+
+            /* Hacer el título más pequeño */
+            .control-panel h2 {
+                font-size: 16px;
+                margin-bottom: 10px;
+            }
+
+            /* Layer count badges */
+            .layer-count {
+                min-width: 28px;
+                height: 28px;
+                font-size: 12px;
+            }
+
+            /* Botón de minimizar/maximizar más grande */
+            .toggle-btn {
+                width: 40px;
+                height: 40px;
+                font-size: 18px;
+            }
+
+            /* Panel minimizado más grande en móvil */
+            .panel-minimized {
+                width: 60px !important;
+                height: 60px !important;
+            }
+
+            /* Ocultar algunos elementos cuando el espacio es limitado */
+            .welcome-modal {
+                padding: 20px;
+                max-width: 90%;
+            }
+
+            .welcome-modal h1 {
+                font-size: 22px;
+            }
+
+            .welcome-modal p {
+                font-size: 14px;
+            }
+
+            /* Ajustar modales de login/registro */
+            #login-modal > div,
+            #register-modal > div {
+                width: 95% !important;
+                padding: 20px !important;
+                max-height: 90vh;
+            }
+
+            /* Hacer los formularios más espaciados en móvil */
+            form > div {
+                margin-bottom: 12px !important;
+            }
+
+            label {
+                font-size: 13px !important;
+            }
+        }
+
+        /* Para pantallas muy pequeñas (teléfonos en portrait) */
+        @media (max-width: 480px) {
+            .control-panel, .legends-panel {
+                font-size: 12px;
+                padding: 12px;
+            }
+
+            .control-panel h2 {
+                font-size: 14px;
+            }
+
+            .control-panel h3 {
+                font-size: 13px;
+            }
+
+            button {
+                font-size: 12px !important;
+                padding: 8px 12px !important;
+            }
+
+            .layer-control {
+                padding: 8px 10px;
+            }
+
+            /* Hacer los popups aún más pequeños */
+            .custom-popup {
+                font-size: 11px;
+                padding: 10px;
+            }
+
+            .custom-popup h3 {
+                font-size: 13px;
+            }
+
+            .custom-popup p {
+                font-size: 11px;
+            }
+
+            /* Botones en popups más pequeños */
+            .custom-popup button {
+                font-size: 10px !important;
+                padding: 5px 8px !important;
+                min-height: 32px !important;
+            }
+
+            /* Grid de botones de admin en una columna */
+            .custom-popup button[onclick*="editProject"],
+            .custom-popup button[onclick*="moveProject"],
+            .custom-popup button[onclick*="deleteProject"] {
+                width: 100%;
+                margin-bottom: 4px;
+            }
+
+            /* Título del geoportal más pequeño */
+            .welcome-modal h1 {
+                font-size: 18px;
+            }
+
+            /* Indicador de captura más compacto */
+            #map-click-indicator {
+                padding: 12px;
+            }
+
+            #map-click-indicator div[style*="font-size: 32px"] {
+                font-size: 24px !important;
+            }
+        }
+
+        /* Para tablets en modo landscape */
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .control-panel {
+                max-width: 350px;
+            }
+
+            .legends-panel {
+                max-width: 350px;
+            }
         }
     </style>
 </head>
@@ -3322,6 +3592,34 @@
                 supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
                 console.log('[STATUS] Supabase inicializado correctamente');
                 
+                // Optimizaciones para móvil
+                if (window.innerWidth <= 768) {
+                    console.log('[MOBILE] Aplicando optimizaciones para dispositivos móviles');
+                    
+                    // Colapsar paneles automáticamente en móvil
+                    const controlPanel = document.querySelector('.control-panel');
+                    const legendsPanel = document.querySelector('.legends-panel');
+                    
+                    if (controlPanel) {
+                        controlPanel.classList.add('panel-minimized');
+                    }
+                    if (legendsPanel) {
+                        legendsPanel.classList.add('panel-minimized');
+                    }
+                    
+                    // Prevenir zoom accidental en doble tap
+                    let lastTouchEnd = 0;
+                    document.addEventListener('touchend', (event) => {
+                        const now = Date.now();
+                        if (now - lastTouchEnd <= 300) {
+                            event.preventDefault();
+                        }
+                        lastTouchEnd = now;
+                    }, { passive: false });
+                    
+                    console.log('[MOBILE] Optimizaciones aplicadas');
+                }
+                
                 // Inicializar funcionalidad de arrastre para paneles
                 setupDraggable();
             } catch (error) {
@@ -3390,6 +3688,18 @@
             });
 
             document.getElementById('add-project-btn').addEventListener('click', () => {
+                // En móvil, colapsar paneles para dar más espacio
+                if (window.innerWidth <= 768) {
+                    const controlPanel = document.querySelector('.control-panel');
+                    const legendsPanel = document.querySelector('.legends-panel');
+                    if (controlPanel && !controlPanel.classList.contains('panel-minimized')) {
+                        controlPanel.classList.add('panel-minimized');
+                    }
+                    if (legendsPanel && !legendsPanel.classList.contains('panel-minimized')) {
+                        legendsPanel.classList.add('panel-minimized');
+                    }
+                }
+                
                 document.getElementById('add-project-modal').style.display = 'flex';
                 document.getElementById('add-project-error').style.display = 'none';
                 document.getElementById('add-project-success').style.display = 'none';
