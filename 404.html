@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redirigiendo...</title>
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            text-align: center;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        h2 {
+            margin: 0 0 10px;
+            font-size: 24px;
+        }
+        p {
+            margin: 0;
+            opacity: 0.9;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="spinner"></div>
+        <h2>Redirigiendo al geoportal...</h2>
+        <p>Por favor espera un momento</p>
+    </div>
+    
+    <script>
+        // Capturar la URL completa incluyendo el hash
+        const currentPath = window.location.pathname;
+        const currentHash = window.location.hash;
+        const currentSearch = window.location.search;
+        
+        console.log('404 Handler - Redirigiendo...');
+        console.log('Path:', currentPath);
+        console.log('Hash:', currentHash);
+        console.log('Search:', currentSearch);
+        
+        // Construir la URL del index.html con el hash preservado
+        const baseUrl = window.location.origin + '/Toma-las-Aguas-Geoportal/';
+        const redirectUrl = baseUrl + currentHash + currentSearch;
+        
+        console.log('Redirigiendo a:', redirectUrl);
+        
+        // Redirigir inmediatamente
+        window.location.replace(redirectUrl);
+    </script>
+</body>
+</html>
