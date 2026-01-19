@@ -1042,7 +1042,17 @@
         </div>
     </div>
 
+    <!-- Indicador flotante para modo de captura de coordenadas -->
+    <div id="map-click-indicator" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10001; background: rgba(147, 51, 234, 0.95); color: white; padding: 30px 40px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); text-align: center; backdrop-filter: blur(10px);">
+        <div style="font-size: 48px; margin-bottom: 15px;">🎯</div>
+        <h3 style="margin: 0 0 10px 0; font-size: 20px;">Modo Captura Activado</h3>
+        <p style="margin: 0 0 20px 0; font-size: 14px; opacity: 0.9;">Haz click en el mapa para seleccionar la ubicación del proyecto</p>
+        <button id="cancel-map-click" style="padding: 10px 24px; background: white; color: #9333ea; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px;">
+            ❌ Cancelar
+        </button>
+    </div>
 
+    <!-- Leaflet JS -->
     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <!-- Supabase JS -->
@@ -1953,12 +1963,15 @@
                         
                         // Desactivar modo click
                         mapClickEnabled = false;
-                        document.getElementById('enable-map-click').textContent = '✓ Coordenadas capturadas';
-                        document.getElementById('enable-map-click').style.background = '#10b981';
                         map.getContainer().style.cursor = '';
                         
-                        // Mostrar el modal de nuevo
+                        // Ocultar indicador y mostrar modal
+                        document.getElementById('map-click-indicator').style.display = 'none';
                         document.getElementById('add-project-modal').style.display = 'flex';
+                        
+                        // Actualizar botón
+                        document.getElementById('enable-map-click').textContent = '✓ Coordenadas capturadas';
+                        document.getElementById('enable-map-click').style.background = '#10b981';
                         
                         setTimeout(() => {
                             document.getElementById('enable-map-click').textContent = '📍 Activar Click en Mapa';
@@ -3322,9 +3335,12 @@
 
             document.getElementById('close-add-project-modal').addEventListener('click', () => {
                 document.getElementById('add-project-modal').style.display = 'none';
+                document.getElementById('map-click-indicator').style.display = 'none';
                 if (mapClickEnabled) {
                     mapClickEnabled = false;
                     map.getContainer().style.cursor = '';
+                    document.getElementById('enable-map-click').textContent = '📍 Activar Click en Mapa';
+                    document.getElementById('enable-map-click').style.background = '#3b82f6';
                     if (tempMarker) {
                         map.removeLayer(tempMarker);
                         tempMarker = null;
@@ -3490,21 +3506,24 @@
                 mapClickEnabled = !mapClickEnabled;
                 const btn = document.getElementById('enable-map-click');
                 const modal = document.getElementById('add-project-modal');
+                const indicator = document.getElementById('map-click-indicator');
                 
                 if (mapClickEnabled) {
                     btn.textContent = '✓ Click Activado - Haz click en el mapa';
                     btn.style.background = '#10b981';
                     map.getContainer().style.cursor = 'crosshair';
                     
-                    // Ocultar el modal temporalmente
+                    // Ocultar el modal y mostrar el indicador
                     modal.style.display = 'none';
+                    indicator.style.display = 'block';
                 } else {
                     btn.textContent = '📍 Activar Click en Mapa';
                     btn.style.background = '#3b82f6';
                     map.getContainer().style.cursor = '';
                     
-                    // Mostrar el modal de nuevo
+                    // Mostrar el modal y ocultar el indicador
                     modal.style.display = 'flex';
+                    indicator.style.display = 'none';
                     
                     if (tempMarker) {
                         map.removeLayer(tempMarker);
@@ -3512,6 +3531,22 @@
                     }
                 }
             });
+
+            // Botón de cancelar en el indicador flotante
+            document.getElementById('cancel-map-click').addEventListener('click', () => {
+                mapClickEnabled = false;
+                map.getContainer().style.cursor = '';
+                document.getElementById('map-click-indicator').style.display = 'none';
+                document.getElementById('add-project-modal').style.display = 'flex';
+                document.getElementById('enable-map-click').textContent = '📍 Activar Click en Mapa';
+                document.getElementById('enable-map-click').style.background = '#3b82f6';
+                
+                if (tempMarker) {
+                    map.removeLayer(tempMarker);
+                    tempMarker = null;
+                }
+            });
+
 
             // Control de capa de proyectos colaborativos
             document.getElementById('layer-proyectos-colab').addEventListener('change', (e) => {
