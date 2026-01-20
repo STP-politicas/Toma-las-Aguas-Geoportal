@@ -2252,6 +2252,54 @@
             }
         }
 
+        // ========== FUNCIONES HELPER PARA FORMATEO ========== //
+        
+        /**
+         * Formatea el volumen de agua de manera inteligente
+         * Si el volumen es menor a 0.1 hm³, lo convierte a m³ para mejor visualización
+         * @param {number} volHm3 - Volumen en hm³
+         * @returns {string} - Volumen formateado con unidad
+         */
+        function formatVolume(volHm3) {
+            if (volHm3 < 0.1) {
+                // Convertir a m³ (1 hm³ = 1,000,000 m³)
+                const volM3 = volHm3 * 1000000;
+                return `${volM3.toLocaleString('es-MX', {maximumFractionDigits: 2})} m³/año`;
+            } else {
+                return `${volHm3.toFixed(2)} hm³/año`;
+            }
+        }
+
+        /**
+         * Calcula el área de un polígono usando la fórmula de Shoelace
+         * @param {Array} coords - Array de coordenadas [[lat, lng], ...]
+         * @returns {number} - Área en metros cuadrados
+         */
+        function calculatePolygonArea(coords) {
+            if (!coords || coords.length < 3) return 0;
+            
+            // Usar la fórmula de Shoelace para calcular área
+            let area = 0;
+            const n = coords.length;
+            
+            for (let i = 0; i < n; i++) {
+                const j = (i + 1) % n;
+                area += coords[i][1] * coords[j][0]; // lng * lat
+                area -= coords[j][1] * coords[i][0]; // lng * lat
+            }
+            
+            area = Math.abs(area) / 2;
+            
+            // Convertir de grados cuadrados a metros cuadrados (aproximado)
+            // En el ecuador: 1 grado ≈ 111,320 metros
+            // En Puerto Morelos (lat ~21°): 1 grado lat ≈ 110,900m, 1 grado lng ≈ 103,500m
+            const metersPerDegreeLat = 110900;
+            const metersPerDegreeLng = 103500;
+            area = area * metersPerDegreeLat * metersPerDegreeLng;
+            
+            return area;
+        }
+
         // Función para verificar si un punto está dentro de un polígono
         function pointInPolygon(point, polygon) {
             const x = point[1], y = point[0]; // [lng, lat] -> x=lat, y=lng
@@ -2957,7 +3005,7 @@
                         <div class="custom-popup-divider" style="border-color: #0369a1;">
                             <p><strong>📋 Titular:</strong> ${item.titular || 'No especificado'}</p>
                             <p><strong>🏷️ Tipo de Uso:</strong> ${item.uso || 'No especificado'}</p>
-                            <p><strong>📊 Volumen Concesionado:</strong> ${vol.toFixed(2)} hm³/año</p>
+                            <p><strong>📊 Volumen Concesionado:</strong> ${formatVolume(vol)}</p>
                             <p><strong>📅 Registro:</strong> ${item.registr || 'No registrada'}</p>
                             <p><strong>🏛️ Autoridad:</strong> ${item.autordd || 'N/A'}</p>
                             ${item.titulo ? `<p><strong>📄 Título:</strong> ${item.titulo}</p>` : ''}
@@ -3037,7 +3085,7 @@
                         <div class="custom-popup-divider" style="border-color: #ea580c;">
                             <p><strong>📋 Titular:</strong> ${item.titular || 'No especificado'}</p>
                             <p><strong>🏷️ Tipo de Uso:</strong> ${item.uso || 'No especificado'}</p>
-                            <p><strong>📊 Volumen Concesionado:</strong> ${vol.toFixed(2)} hm³/año</p>
+                            <p><strong>📊 Volumen Concesionado:</strong> ${formatVolume(vol)}</p>
                             <p><strong>📅 Fecha de Registro:</strong> ${item.dia || ''}/${item.mes || ''}/${item.año || ''}</p>
                             <p><strong>🏛️ Autoridad:</strong> ${item.autoridad || 'N/A'}</p>
                             ${item.titulo ? `<p><strong>📄 Título:</strong> ${item.titulo}</p>` : ''}
@@ -3232,7 +3280,28 @@
                 const uga = item.UGA || 'N/A';
                 const politica = item["Política"] || 'default';
                 const aprovechamiento = item.Aprovechamiento || item.Aprovecha || 'N/A';
-                const area = parseFloat(item.ha_uga || item.ha || 0) * 10000;
+                
+                // Calcular área: primero intentar desde los datos, si no calcular geométricamente
+                let area = parseFloat(item.ha_uga || item.ha || 0) * 10000;
+                
+                // Si el área es 0, calcular geométricamente
+                if (area === 0) {
+                    const coords = parseGeoJSON(geom);
+                    if (coords && coords.length > 0) {
+                        // Para MultiPolygon, sumar todas las partes
+                        if (geom.type === 'MultiPolygon') {
+                            coords.forEach(polygon => {
+                                if (polygon.length > 0) {
+                                    area += calculatePolygonArea(polygon[0]);
+                                }
+                            });
+                        } else {
+                            // Para Polygon simple
+                            area = calculatePolygonArea(coords[0]);
+                        }
+                        console.log(`UGA ${uga}: Área calculada geométricamente: ${area.toFixed(0)} m²`);
+                    }
+                }
                 
                 if (!ugaPolygons[uga]) {
                     ugaPolygons[uga] = [];
@@ -3246,6 +3315,11 @@
                         cuerposAgua: {},
                         riosArt: {count: 0, area: 0}
                     };
+                } else {
+                    // Si ya existe la UGA, actualizar el área si es mayor
+                    if (area > ugaData[uga].area) {
+                        ugaData[uga].area = area;
+                    }
                 }
                 
                 ugaPolygons[uga].push(geom);
@@ -3374,11 +3448,11 @@
                     }
                     
                     if (ugaInfo.descargas.count > 0) {
-                        elementosHTML += `<p>• <strong>${ugaInfo.descargas.count}</strong> Descargas (${ugaInfo.descargas.vol.toFixed(2)} hm³/año)</p>`;
+                        elementosHTML += `<p>• <strong>${ugaInfo.descargas.count}</strong> Descargas (${formatVolume(ugaInfo.descargas.vol)})</p>`;
                     }
                     
                     if (ugaInfo.extracciones.count > 0) {
-                        elementosHTML += `<p>• <strong>${ugaInfo.extracciones.count}</strong> Extracciones (${ugaInfo.extracciones.vol.toFixed(2)} hm³/año)</p>`;
+                        elementosHTML += `<p>• <strong>${ugaInfo.extracciones.count}</strong> Extracciones (${formatVolume(ugaInfo.extracciones.vol)})</p>`;
                     }
 
                     if (ugaInfo.riosArt.count > 0) {
