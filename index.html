@@ -1208,8 +1208,8 @@
         <div class="layer-control">
             <input type="checkbox" id="layer-socioeco" checked>
             <label for="layer-socioeco">
-                <span class="color-indicator" style="background: linear-gradient(135deg, #38b2ac, #4299e1);"></span>
-                Socioecosistema
+                <span class="color-indicator" style="background: linear-gradient(135deg, #10b981, #0891b2);"></span>
+                Zonas Inundables
             </label>
             <span class="layer-count" id="count-socioeco">0</span>
         </div>
@@ -1220,6 +1220,22 @@
                 Límite Municipal
             </label>
             <span class="layer-count" id="count-municipio">0</span>
+        </div>
+        <div class="layer-control">
+            <input type="checkbox" id="layer-pozos-sin" checked>
+            <label for="layer-pozos-sin">
+                <span class="color-indicator" style="background-color: transparent; border: 3px solid #ef4444;"></span>
+                Pozos sin Protección
+            </label>
+            <span class="layer-count" id="count-pozos-sin">0</span>
+        </div>
+        <div class="layer-control">
+            <input type="checkbox" id="layer-pozos-con" checked>
+            <label for="layer-pozos-con">
+                <span class="color-indicator" style="background-color: transparent; border: 3px solid #10b981;"></span>
+                Pozos con Protección
+            </label>
+            <span class="layer-count" id="count-pozos-con">0</span>
         </div>
     </div>
 
@@ -1501,16 +1517,19 @@
                 'default': '#a0aec0'
             },
             socioeco: {
-                'Manglar': '#38b2ac',
-                'Selva': '#2f855a',
-                'Urbano': '#e53e3e',
-                'Agrícola': '#d69e2e',
-                'Costero': '#4299e1',
+                'manglar': '#10b981',
+                'manglar2': '#059669',
+                'tular': '#0891b2',
+                'planicie carstica sujeta a inu': '#0284c7',
+                'suelo con poca vegetacion prop': '#fbbf24',
+                'zona de manglar inundada (est': '#06b6d4',
                 'default': '#718096'
             },
             fallasINEGI: '#9f7aea',
             fallasCENAPRED: '#ed64a6',
-            municipio: '#4a5568'
+            municipio: '#4a5568',
+            pozosSinProteccion: '#ef4444',
+            pozosConProteccion: '#10b981'
         };
 
         // ========== FUNCIONES PARA MODAL DE BIENVENIDA ==========
@@ -1702,10 +1721,6 @@
 
         function getPOELColor(politica) {
             return COLORS.poel[politica] || COLORS.poel.default;
-        }
-
-        function getSocioEcoColor(tipo) {
-            return COLORS.socioeco[tipo] || COLORS.socioeco.default;
         }
 
         // ======== AUTENTICACIÓN Y PROYECTOS COLABORATIVOS ========
@@ -2388,7 +2403,9 @@
                     fallasCENAPRED: L.layerGroup(),
                     poel: L.layerGroup(),
                     socioeco: L.layerGroup(),
-                    municipio: L.layerGroup()
+                    municipio: L.layerGroup(),
+                    pozosSinProteccion: L.layerGroup(),
+                    pozosConProteccion: L.layerGroup()
                 };
                 
                 // Crear mapa Leaflet
@@ -2786,6 +2803,48 @@
                     }
                 }
             } catch (e) { console.error('Error municipio:', e); }
+
+            // POZOS SIN PROTECCIÓN
+            try {
+                updateLoading('Cargando pozos sin protección...');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('sin protecc')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        updateLayerCount('pozos-sin', data.length);
+                        renderPozosSinProteccion(data);
+                        console.log(`✓ ${data.length} pozos sin protección cargados`);
+                    }
+                }
+            } catch (e) { console.error('Error pozos sin protección:', e); }
+
+            // POZOS CON PROTECCIÓN
+            try {
+                updateLoading('Cargando pozos con protección...');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('protección pozo BJ-pm')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        updateLayerCount('pozos-con', data.length);
+                        renderPozosConProteccion(data);
+                        console.log(`✓ ${data.length} pozos con protección cargados`);
+                    }
+                }
+            } catch (e) { console.error('Error pozos con protección:', e); }
 
             // POEL 2013 - Cargar al final para análisis espacial
             try {
@@ -3601,12 +3660,26 @@
         }
 
         function renderSocioecosistema(data) {
+            // Lista de tipos que queremos mostrar (zonas inundables)
+            const tiposPermitidos = [
+                'manglar',
+                'manglar2',
+                'tular',
+                'planicie carstica sujeta a inu',
+                'suelo con poca vegetacion prop',
+                'zona de manglar inundada (est'
+            ];
+            
             data.forEach(item => {
                 const geom = parseGeometry(item);
                 if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
 
-                const tipo = item.Tipo_sist || 'default';
-                const color = getSocioEcoColor(tipo);
+                const tipo = (item.Tipo_sist || item.tipo_sist || item.TIPO_SIST || '').toLowerCase().trim();
+                
+                // Solo renderizar si está en la lista de tipos permitidos
+                if (!tiposPermitidos.includes(tipo)) return;
+                
+                const color = COLORS.socioeco[tipo] || COLORS.socioeco.default;
 
                 const coords = parseGeoJSON(geom);
                 if (coords && coords.length > 0) {
@@ -3620,10 +3693,10 @@
 
                     const popupContent = `
                         <div class="custom-popup">
-                            <h3 style="color: ${color};">Socioecosistema</h3>
+                            <h3 style="color: ${color};">Zona Inundable</h3>
                             <div class="custom-popup-divider" style="border-color: ${color};">
                                 <p><strong>Tipo:</strong> ${tipo}</p>
-                                <p><strong>Hectáreas:</strong> ${(item.ha || 0).toLocaleString()}</p>
+                                ${item.ha ? `<p><strong>Hectáreas:</strong> ${(item.ha).toLocaleString()}</p>` : ''}
                             </div>
                         </div>
                     `;
@@ -3668,6 +3741,86 @@
 
                     polygon.bindPopup(popupContent);
                     polygon.addTo(layerGroups.municipio);
+                }
+            });
+        }
+
+        function renderPozosSinProteccion(data) {
+            data.forEach(item => {
+                const geom = parseGeometry(item);
+                if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+
+                const coords = parseGeoJSON(geom);
+                if (coords && coords.length > 0) {
+                    const polygon = L.polygon(coords, {
+                        color: COLORS.pozosSinProteccion,  // Rojo
+                        fillColor: COLORS.pozosSinProteccion,
+                        fillOpacity: 0,  // Sin relleno, solo contorno
+                        weight: 4,  // Contorno ancho
+                        opacity: 1
+                    });
+
+                    const popupContent = `
+                        <div class="custom-popup">
+                            <h3 style="color: ${COLORS.pozosSinProteccion};">⚠️ Pozo sin Protección</h3>
+                            <div class="custom-popup-divider" style="border-color: ${COLORS.pozosSinProteccion};">
+                                <p><strong>Estado:</strong> Sin protección</p>
+                                ${item.nombre || item.NOMBRE ? `<p><strong>Nombre:</strong> ${item.nombre || item.NOMBRE}</p>` : ''}
+                                ${item.area || item.AREA ? `<p><strong>Área:</strong> ${(item.area || item.AREA).toLocaleString()} m²</p>` : ''}
+                            </div>
+                        </div>
+                    `;
+
+                    polygon.bindPopup(popupContent);
+                    
+                    polygon.on('mouseover', function() {
+                        this.setStyle({ weight: 5, opacity: 1 });
+                    });
+                    polygon.on('mouseout', function() {
+                        this.setStyle({ weight: 4, opacity: 1 });
+                    });
+
+                    polygon.addTo(layerGroups.pozosSinProteccion);
+                }
+            });
+        }
+
+        function renderPozosConProteccion(data) {
+            data.forEach(item => {
+                const geom = parseGeometry(item);
+                if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+
+                const coords = parseGeoJSON(geom);
+                if (coords && coords.length > 0) {
+                    const polygon = L.polygon(coords, {
+                        color: COLORS.pozosConProteccion,  // Verde
+                        fillColor: COLORS.pozosConProteccion,
+                        fillOpacity: 0,  // Sin relleno, solo contorno
+                        weight: 4,  // Contorno ancho
+                        opacity: 1
+                    });
+
+                    const popupContent = `
+                        <div class="custom-popup">
+                            <h3 style="color: ${COLORS.pozosConProteccion};">✅ Pozo con Protección</h3>
+                            <div class="custom-popup-divider" style="border-color: ${COLORS.pozosConProteccion};">
+                                <p><strong>Estado:</strong> Con protección</p>
+                                ${item.nombre || item.NOMBRE ? `<p><strong>Nombre:</strong> ${item.nombre || item.NOMBRE}</p>` : ''}
+                                ${item.area || item.AREA ? `<p><strong>Área:</strong> ${(item.area || item.AREA).toLocaleString()} m²</p>` : ''}
+                            </div>
+                        </div>
+                    `;
+
+                    polygon.bindPopup(popupContent);
+                    
+                    polygon.on('mouseover', function() {
+                        this.setStyle({ weight: 5, opacity: 1 });
+                    });
+                    polygon.on('mouseout', function() {
+                        this.setStyle({ weight: 4, opacity: 1 });
+                    });
+
+                    polygon.addTo(layerGroups.pozosConProteccion);
                 }
             });
         }
@@ -3766,6 +3919,16 @@
         document.getElementById('layer-municipio').addEventListener('change', (e) => {
             if (e.target.checked) map.addLayer(layerGroups.municipio);
             else map.removeLayer(layerGroups.municipio);
+        });
+
+        document.getElementById('layer-pozos-sin').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.pozosSinProteccion);
+            else map.removeLayer(layerGroups.pozosSinProteccion);
+        });
+
+        document.getElementById('layer-pozos-con').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.pozosConProteccion);
+            else map.removeLayer(layerGroups.pozosConProteccion);
         });
 
         // Función para minimizar/maximizar paneles
@@ -3923,6 +4086,61 @@
 
             // Primero inicializar el mapa
             await initMap();
+            
+            // Sincronizar capas visibles con checkboxes al inicio
+            const initialCheckboxes = [
+                'layer-proyectos',
+                'layer-descargas',
+                'layer-extracciones',
+                'layer-cuerpos-agua',
+                'layer-piscinas',
+                'layer-cenotes-sup',
+                'layer-cenotes-sub',
+                'layer-aguadas-art',
+                'layer-aguadas-nat',
+                'layer-sascab',
+                'layer-rios',
+                'layer-karstificacion',
+                'layer-fallas-inegi',
+                'layer-fallas-cenapred',
+                'layer-poel',
+                'layer-socioeco',
+                'layer-municipio',
+                'layer-pozos-sin',
+                'layer-pozos-con'
+            ];
+            
+            initialCheckboxes.forEach(checkboxId => {
+                const checkbox = document.getElementById(checkboxId);
+                if (checkbox && checkbox.checked) {
+                    const layerMapping = {
+                        'layer-proyectos': 'proyectos',
+                        'layer-descargas': 'descargas',
+                        'layer-extracciones': 'extracciones',
+                        'layer-cuerpos-agua': 'cuerposAgua',
+                        'layer-piscinas': 'piscinas',
+                        'layer-cenotes-sup': 'cenotesSup',
+                        'layer-cenotes-sub': 'cenotesSub',
+                        'layer-aguadas-art': 'aguadasArt',
+                        'layer-aguadas-nat': 'aguadasNat',
+                        'layer-sascab': 'sascab',
+                        'layer-rios': 'rios',
+                        'layer-karstificacion': 'karstificacion',
+                        'layer-fallas-inegi': 'fallasINEGI',
+                        'layer-fallas-cenapred': 'fallasCENAPRED',
+                        'layer-poel': 'poel',
+                        'layer-socioeco': 'socioeco',
+                        'layer-municipio': 'municipio',
+                        'layer-pozos-sin': 'pozosSinProteccion',
+                        'layer-pozos-con': 'pozosConProteccion'
+                    };
+                    
+                    const layerName = layerMapping[checkboxId];
+                    if (layerName && layerGroups[layerName]) {
+                        map.addLayer(layerGroups[layerName]);
+                    }
+                }
+            });
             
             // Luego cargar proyectos colaborativos (pueden no haber si no hay auth)
             try {
