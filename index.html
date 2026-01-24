@@ -1552,12 +1552,14 @@
                 'default': '#a0aec0'
             },
             socioeco: {
-                'manglar': '#10b981',
-                'manglar 2': '#059669',
-                'tular': '#0891b2',
-                'planicie carstica sujeta a inu': '#0284c7',
-                'suelo con poca vegetacion prop': '#fbbf24',
-                'zona de manglar inundada (est': '#06b6d4',
+                'manglar': '#06b6d4',                              // Cyan 500
+                'manglar 2': '#0891b2',                            // Cyan 600
+                'tular': '#0e7490',                                // Cyan 700
+                'planicie carstica sujeta a inu': '#0284c7',       // Sky 600
+                'suelo con poca vegetacion prop': '#0ea5e9',       // Sky 500
+                'zona de manglar inundada (est': '#38bdf8',        // Sky 400
+                'selva mediana perennifolia': '#075985',           // Sky 700
+                'nubes': '#0369a1',                                // Sky 700
                 'default': '#718096'
             },
             fallasINEGI: '#9f7aea',
@@ -3743,8 +3745,22 @@
                 'tular',
                 'planicie carstica sujeta a inu',
                 'suelo con poca vegetacion prop',
-                'zona de manglar inundada (est'
+                'zona de manglar inundada (est',
+                'selva mediana perennifolia',
+                'nubes'
             ];
+            
+            // Mapeo de nombres para mostrar en el popup
+            const nombresDisplay = {
+                'manglar': 'Manglar',
+                'manglar 2': 'Manglar 2',
+                'tular': 'Tular',
+                'planicie carstica sujeta a inu': 'Planicie cárstica sujeta a inundación',
+                'suelo con poca vegetacion prop': 'Suelo con poca vegetación propensa a inundación',
+                'zona de manglar inundada (est': 'Zona de manglar inundada',
+                'selva mediana perennifolia': 'Manglar con selva mediana perennifolia',
+                'nubes': 'Planicies kársticas sujetas a inundación'
+            };
             
             console.log('Tipos permitidos:', tiposPermitidos);
             
@@ -3823,7 +3839,7 @@
                         <div class="custom-popup">
                             <h3 style="color: ${color};">Zona Inundable</h3>
                             <div class="custom-popup-divider" style="border-color: ${color};">
-                                <p><strong>Tipo:</strong> ${tipo}</p>
+                                <p><strong>Tipo:</strong> ${nombresDisplay[tipo] || tipo}</p>
                                 ${item.ha ? `<p><strong>Hectáreas:</strong> ${(item.ha).toLocaleString()}</p>` : ''}
                             </div>
                         </div>
