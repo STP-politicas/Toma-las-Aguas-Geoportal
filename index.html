@@ -1936,6 +1936,12 @@
             const isAdmin = currentUser && currentUser.email === 'storresperdigon@politicas.unam.mx';
             
             data.forEach(item => {
+                // Validar coordenadas antes de crear el marker
+                if (!item.lat || !item.lng || isNaN(item.lat) || isNaN(item.lng)) {
+                    console.warn('Proyecto colaborativo sin coordenadas válidas:', item);
+                    return;
+                }
+                
                 const marker = L.circleMarker([item.lat, item.lng], {
                     radius: 8,
                     fillColor: COLORS.proyectosColab,
@@ -3037,8 +3043,20 @@
                 const geom = parseGeometry(item);
                 if (!geom || geom.type !== 'Point') return;
 
+                // Validar que las coordenadas existan
+                if (!geom.coordinates || geom.coordinates.length < 2) {
+                    console.warn('Proyecto sin coordenadas válidas:', item);
+                    return;
+                }
+
                 const lat = geom.coordinates[1];
                 const lng = geom.coordinates[0];
+                
+                // Validar que sean números válidos
+                if (isNaN(lat) || isNaN(lng)) {
+                    console.warn('Coordenadas inválidas:', { lat, lng });
+                    return;
+                }
 
                 // Guardar para análisis espacial
                 allLayersData.proyectos.push({
