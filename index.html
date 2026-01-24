@@ -1481,6 +1481,9 @@
     <!-- Leaflet JS -->
     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
     
+    <!-- Proj4js para conversión de coordenadas UTM a WGS84 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
+    
     <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
     
@@ -1489,6 +1492,38 @@
 
         const SUPABASE_URL = 'https://mrniyxyurgbpfqfuzgws.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ybml5eHl1cmdicGZxZnV6Z3dzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MTI1OTgsImV4cCI6MjA4MDk4ODU5OH0.tkZIuDNUreGSqLL0JvuzJepZEfducQ3L5N4BS7Jxv4M';
+
+        // Definir proyecciones para conversión de coordenadas
+        // EPSG:32616 es UTM Zone 16N (usado en Quintana Roo, México)
+        const UTM_ZONE_16N = '+proj=utm +zone=16 +datum=WGS84 +units=m +no_defs';
+        const WGS84 = 'EPSG:4326'; // Lat/Lon estándar
+        
+        // Función para detectar si coordenadas son UTM
+        function isUTM(x, y) {
+            // UTM en esta zona tiene valores aproximados:
+            // X (Easting): 400,000 - 700,000
+            // Y (Northing): 2,200,000 - 2,400,000
+            return Math.abs(x) > 1000 || Math.abs(y) > 1000;
+        }
+        
+        // Función para convertir coordenadas UTM a Lat/Lon
+        function convertUTMtoLatLon(x, y) {
+            try {
+                if (typeof proj4 === 'undefined') {
+                    console.error('proj4 no está cargado');
+                    return null;
+                }
+                
+                const result = proj4(UTM_ZONE_16N, WGS84, [x, y]);
+                return {
+                    lon: result[0],
+                    lat: result[1]
+                };
+            } catch (e) {
+                console.error('Error convirtiendo coordenadas:', e);
+                return null;
+            }
+        }
 
         // Variables globales (se inicializarán cuando las librerías estén cargadas)
         let map;
@@ -1667,12 +1702,32 @@
 
                 for (const polygon of coords) {
                     for (const ring of polygon) {
-                        const leafletCoords = ring.map(coord => [coord[1], coord[0]]);
-                        allPolygons.push(leafletCoords);
+                        const leafletCoords = ring.map(coord => {
+                            const x = coord[0];
+                            const y = coord[1];
+                            
+                            // Detectar si son coordenadas UTM y convertir
+                            if (isUTM(x, y)) {
+                                const converted = convertUTMtoLatLon(x, y);
+                                if (converted) {
+                                    return [converted.lat, converted.lon];
+                                } else {
+                                    console.warn('No se pudo convertir coordenada UTM:', { x, y });
+                                    return null;
+                                }
+                            } else {
+                                // Ya son lat/lon, solo invertir orden
+                                return [y, x];
+                            }
+                        }).filter(c => c !== null); // Remover coordenadas que no se pudieron convertir
+                        
+                        if (leafletCoords.length > 0) {
+                            allPolygons.push(leafletCoords);
+                        }
                     }
                 }
 
-                return allPolygons;
+                return allPolygons.length > 0 ? allPolygons : null;
             } catch (e) {
                 console.error('Error parsing GeoJSON:', e);
                 return null;
@@ -4037,20 +4092,21 @@
             // Función para esperar a que las librerías estén disponibles
             async function waitForLibraries() {
                 let attempts = 0;
-                const maxAttempts = 100; // 10 segundos máximo (era 5)
+                const maxAttempts = 100; // 10 segundos máximo
                 
-                console.log('[INFO] Esperando a que se carguen Leaflet y Supabase...');
+                console.log('[INFO] Esperando a que se carguen Leaflet, Proj4 y Supabase...');
                 
                 while (attempts < maxAttempts) {
                     const leafletLoaded = typeof L !== 'undefined';
+                    const proj4Loaded = typeof proj4 !== 'undefined';
                     const supabaseLoaded = typeof supabase !== 'undefined';
                     
                     if (attempts % 10 === 0) { // Log cada segundo
-                        console.log(`[CHECK] Intento ${attempts}: Leaflet=${leafletLoaded}, Supabase=${supabaseLoaded}`);
+                        console.log(`[CHECK] Intento ${attempts}: Leaflet=${leafletLoaded}, Proj4=${proj4Loaded}, Supabase=${supabaseLoaded}`);
                     }
                     
-                    if (leafletLoaded && supabaseLoaded) {
-                        console.log('[SUCCESS] ✓ Librerías cargadas correctamente');
+                    if (leafletLoaded && proj4Loaded && supabaseLoaded) {
+                        console.log('[SUCCESS] ✓ Todas las librerías cargadas correctamente');
                         return true;
                     }
                     
@@ -4060,8 +4116,9 @@
                 
                 // Si llegamos aquí, hubo timeout
                 const leafletLoaded = typeof L !== 'undefined';
+                const proj4Loaded = typeof proj4 !== 'undefined';
                 const supabaseLoaded = typeof supabase !== 'undefined';
-                console.error(`[TIMEOUT] Leaflet: ${leafletLoaded}, Supabase: ${supabaseLoaded}`);
+                console.error(`[TIMEOUT] Leaflet: ${leafletLoaded}, Proj4: ${proj4Loaded}, Supabase: ${supabaseLoaded}`);
                 throw new Error('Timeout esperando librerías');
             }
             
