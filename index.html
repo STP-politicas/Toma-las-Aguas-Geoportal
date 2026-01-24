@@ -1553,7 +1553,7 @@
             },
             socioeco: {
                 'manglar': '#10b981',
-                'manglar2': '#059669',
+                'manglar 2': '#059669',
                 'tular': '#0891b2',
                 'planicie carstica sujeta a inu': '#0284c7',
                 'suelo con poca vegetacion prop': '#fbbf24',
@@ -3733,29 +3733,84 @@
         }
 
         function renderSocioecosistema(data) {
+            console.log('=== RENDERIZANDO SOCIOECOSISTEMA (ZONAS INUNDABLES) ===');
+            console.log('Total items recibidos:', data.length);
+            
             // Lista de tipos que queremos mostrar (zonas inundables)
             const tiposPermitidos = [
                 'manglar',
-                'manglar2',
+                'manglar 2',
                 'tular',
                 'planicie carstica sujeta a inu',
                 'suelo con poca vegetacion prop',
                 'zona de manglar inundada (est'
             ];
             
-            data.forEach(item => {
+            console.log('Tipos permitidos:', tiposPermitidos);
+            
+            let rendered = 0;
+            let filteredOut = 0;
+            let noGeometry = 0;
+            let wrongType = 0;
+            let noCoords = 0;
+            let errorCount = 0;
+            
+            // Contar tipos encontrados
+            const tiposEncontrados = {};
+            
+            data.forEach((item, index) => {
+                // Logging del primer item para debug
+                if (index === 0) {
+                    console.log('Primer item completo:', item);
+                    console.log('Campo Tipo_sist:', item.Tipo_sist);
+                    console.log('Campo tipo_sist:', item.tipo_sist);
+                    console.log('Campo TIPO_SIST:', item.TIPO_SIST);
+                    console.log('Campo geojson:', item.geojson ? 'presente' : 'ausente');
+                    console.log('Campo geom:', item.geom ? 'presente' : 'ausente');
+                }
+                
                 const geom = parseGeometry(item);
-                if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+                if (!geom) {
+                    noGeometry++;
+                    if (index < 3) console.log(`Item ${index}: No geometry`);
+                    return;
+                }
+                
+                if (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon') {
+                    wrongType++;
+                    if (index < 3) console.log(`Item ${index}: Wrong type ${geom.type}`);
+                    return;
+                }
 
-                const tipo = (item.Tipo_sist || item.tipo_sist || item.TIPO_SIST || '').toLowerCase().trim();
+                const tipo = (item.CLASS_NAME || item.class_name || item.Tipo_sist || item.tipo_sist || '').toLowerCase().trim();
+                
+                // Contar tipos
+                if (!tiposEncontrados[tipo]) {
+                    tiposEncontrados[tipo] = 0;
+                }
+                tiposEncontrados[tipo]++;
                 
                 // Solo renderizar si está en la lista de tipos permitidos
-                if (!tiposPermitidos.includes(tipo)) return;
+                if (!tiposPermitidos.includes(tipo)) {
+                    filteredOut++;
+                    return;
+                }
                 
                 const color = COLORS.socioeco[tipo] || COLORS.socioeco.default;
 
                 const coords = parseGeoJSON(geom);
-                if (coords && coords.length > 0) {
+                if (!coords || coords.length === 0) {
+                    noCoords++;
+                    if (index < 3) console.log(`Item ${index}: Failed to parse coordinates`);
+                    return;
+                }
+                
+                // Log primera coordenada del primer polígono renderizado
+                if (rendered === 0) {
+                    console.log('Primera coordenada a renderizar:', coords[0][0]);
+                }
+                
+                try {
                     const polygon = L.polygon(coords, {
                         color: color,
                         fillColor: color,
@@ -3784,8 +3839,22 @@
                     });
 
                     polygon.addTo(layerGroups.socioeco);
+                    rendered++;
+                } catch (e) {
+                    errorCount++;
+                    if (errorCount < 3) console.error(`Error rendering polygon ${index}:`, e);
                 }
             });
+            
+            console.log('=== RESUMEN SOCIOECOSISTEMA ===');
+            console.log('Total items:', data.length);
+            console.log('✓ Renderizados:', rendered);
+            console.log('❌ Sin geometría:', noGeometry);
+            console.log('❌ Tipo incorrecto:', wrongType);
+            console.log('❌ Filtrados (no son zonas inundables):', filteredOut);
+            console.log('❌ Error parseando coordenadas:', noCoords);
+            console.log('❌ Error creando polígono:', errorCount);
+            console.log('📊 Tipos encontrados:', tiposEncontrados);
         }
 
         function renderMunicipio(data) {
