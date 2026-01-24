@@ -3746,17 +3746,42 @@
         }
 
         function renderPozosSinProteccion(data) {
-            data.forEach(item => {
+            console.log('=== RENDERIZANDO POZOS SIN PROTECCIÓN ===');
+            console.log('Total items:', data.length);
+            
+            let rendered = 0;
+            data.forEach((item, index) => {
+                if (index === 0) {
+                    console.log('Primer item:', item);
+                }
+                
                 const geom = parseGeometry(item);
-                if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+                if (!geom) {
+                    console.log(`Item ${index}: No geometry found`);
+                    return;
+                }
+                
+                if (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon') {
+                    console.log(`Item ${index}: Wrong geometry type:`, geom.type);
+                    return;
+                }
 
                 const coords = parseGeoJSON(geom);
-                if (coords && coords.length > 0) {
+                if (!coords || coords.length === 0) {
+                    console.log(`Item ${index}: Failed to parse coordinates`);
+                    return;
+                }
+                
+                if (index === 0) {
+                    console.log('Primera coordenada:', coords[0][0]);
+                }
+                
+                try {
                     const polygon = L.polygon(coords, {
-                        color: COLORS.pozosSinProteccion,  // Rojo
+                        color: COLORS.pozosSinProteccion,
                         fillColor: COLORS.pozosSinProteccion,
-                        fillOpacity: 0,  // Sin relleno, solo contorno
-                        weight: 4,  // Contorno ancho
+                        fillOpacity: 0,
+                        weight: 4,
                         opacity: 1
                     });
 
@@ -3781,22 +3806,52 @@
                     });
 
                     polygon.addTo(layerGroups.pozosSinProteccion);
+                    rendered++;
+                } catch (e) {
+                    console.error(`Error rendering polygon ${index}:`, e);
                 }
             });
+            
+            console.log(`✓ Rendered ${rendered} of ${data.length} pozos sin protección`);
         }
 
         function renderPozosConProteccion(data) {
-            data.forEach(item => {
+            console.log('=== RENDERIZANDO POZOS CON PROTECCIÓN ===');
+            console.log('Total items:', data.length);
+            
+            let rendered = 0;
+            data.forEach((item, index) => {
+                if (index === 0) {
+                    console.log('Primer item:', item);
+                }
+                
                 const geom = parseGeometry(item);
-                if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+                if (!geom) {
+                    console.log(`Item ${index}: No geometry found`);
+                    return;
+                }
+                
+                if (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon') {
+                    console.log(`Item ${index}: Wrong geometry type:`, geom.type);
+                    return;
+                }
 
                 const coords = parseGeoJSON(geom);
-                if (coords && coords.length > 0) {
+                if (!coords || coords.length === 0) {
+                    console.log(`Item ${index}: Failed to parse coordinates`);
+                    return;
+                }
+                
+                if (index === 0) {
+                    console.log('Primera coordenada:', coords[0][0]);
+                }
+                
+                try {
                     const polygon = L.polygon(coords, {
-                        color: COLORS.pozosConProteccion,  // Verde
+                        color: COLORS.pozosConProteccion,
                         fillColor: COLORS.pozosConProteccion,
-                        fillOpacity: 0,  // Sin relleno, solo contorno
-                        weight: 4,  // Contorno ancho
+                        fillOpacity: 0,
+                        weight: 4,
                         opacity: 1
                     });
 
@@ -3821,8 +3876,13 @@
                     });
 
                     polygon.addTo(layerGroups.pozosConProteccion);
+                    rendered++;
+                } catch (e) {
+                    console.error(`Error rendering polygon ${index}:`, e);
                 }
             });
+            
+            console.log(`✓ Rendered ${rendered} of ${data.length} pozos con protección`);
         }
 
         // Controles de capas
