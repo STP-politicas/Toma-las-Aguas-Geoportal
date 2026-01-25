@@ -900,13 +900,13 @@
             <span class="welcome-icon">🌊💧🏝️</span>
             
             <div class="welcome-header">
-                <h2>Bienvenido al Geoportal de Toma las Aguas</h2>
+                <h2>Bienvenido al Geoportal Toma las Aguas</h2>
                 <p class="subtitle">Transparencia y Participación Ciudadana para la Seguridad Hídrica de Puerto Morelos</p>
             </div>
 
             <div class="welcome-section">
                 <h3>🗺️ ¿Por qué este geoportal?</h3>
-                <p>Puerto Morelos se ubica en una de las regiones hidrológicamente más estratégicas y, al mismo tiempo, más vulnerables de la Península de Yucatán. Su territorio descansa sobre un <strong>acuífero kárstico</strong>, un sistema geológico de extrema fragilidad, en el que el agua se infiltra directamente a través de la roca caliza porosa hacia nuestro único reservorio de agua dulce, lo que hace indispensable su protección.</p>
+                <p>Puerto Morelos se encuentra en una de las zonas más vulnerables hidrológicamente de la Península de Yucatán. Este territorio descansa sobre un <strong>acuífero kárstico</strong>, un sistema geológico extraordinariamente frágil donde el agua se filtra directamente a través de roca caliza porosa hacia nuestro único reservorio de agua dulce.</p>
             </div>
 
             <div class="alert-box">
@@ -1075,7 +1075,7 @@
             <input type="checkbox" id="layer-descargas" checked>
             <label for="layer-descargas">
                 <span class="color-indicator" style="background: linear-gradient(90deg, #7dd3fc, #0369a1);"></span>
-                Descargas de agua residual 2023
+                Descargas 2023
             </label>
             <span class="layer-count" id="count-descargas">0</span>
         </div>
@@ -1083,7 +1083,7 @@
             <input type="checkbox" id="layer-extracciones" checked>
             <label for="layer-extracciones">
                 <span class="color-indicator" style="background: linear-gradient(90deg, #fb923c, #ea580c);"></span>
-                Extracciones de agua dulce 2023
+                Extracciones 2023
             </label>
             <span class="layer-count" id="count-extracciones">0</span>
         </div>
@@ -1209,7 +1209,7 @@
             <input type="checkbox" id="layer-socioeco" checked>
             <label for="layer-socioeco">
                 <span class="color-indicator" style="background: linear-gradient(135deg, #10b981, #0891b2);"></span>
-                Zonas Inundables / Humedales temporales
+                Zonas Inundables
             </label>
             <span class="layer-count" id="count-socioeco">0</span>
         </div>
@@ -2020,17 +2020,26 @@
                 if (isOwner && !isAdmin) {
                     ownerButtons = `
                         <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
-                            <button class="edit-project-btn" data-project-id="${item.id}" style="
-                                width: 100%;
-                                padding: 8px 12px;
-                                background: #f59e0b;
-                                color: white;
-                                border: none;
-                                border-radius: 4px;
-                                cursor: pointer;
-                                font-size: 12px;
-                                font-weight: 600;
-                            ">
+                            <button 
+                                class="edit-project-btn" 
+                                data-project-id="${item.id}" 
+                                type="button"
+                                style="
+                                    width: 100%;
+                                    padding: 10px 12px;
+                                    background: #f59e0b;
+                                    color: white;
+                                    border: none;
+                                    border-radius: 4px;
+                                    cursor: pointer;
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    pointer-events: auto;
+                                    touch-action: manipulation;
+                                    user-select: none;
+                                "
+                                onclick="event.stopPropagation(); event.preventDefault(); editProject('${item.id}');"
+                            >
                                 ✏️ Editar mi proyecto
                             </button>
                         </div>
@@ -2044,40 +2053,69 @@
                         <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
                             <p style="font-size: 11px; color: #6b7280; margin-bottom: 8px;">⚙️ Controles de Administrador</p>
                             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;">
-                                <button class="edit-project-btn" data-project-id="${item.id}" style="
-                                    padding: 6px 8px;
-                                    background: #f59e0b;
-                                    color: white;
-                                    border: none;
-                                    border-radius: 4px;
-                                    cursor: pointer;
-                                    font-size: 11px;
-                                    font-weight: 600;
-                                ">
+                                <button 
+                                    class="edit-project-btn" 
+                                    data-project-id="${item.id}" 
+                                    type="button"
+                                    style="
+                                        padding: 8px 10px;
+                                        background: #f59e0b;
+                                        color: white;
+                                        border: none;
+                                        border-radius: 4px;
+                                        cursor: pointer;
+                                        font-size: 11px;
+                                        font-weight: 600;
+                                        pointer-events: auto;
+                                        touch-action: manipulation;
+                                        user-select: none;
+                                    "
+                                    onclick="event.stopPropagation(); event.preventDefault(); editProject('${item.id}');"
+                                >
                                     ✏️ Editar
                                 </button>
-                                <button class="move-project-btn" data-project-id="${item.id}" data-lat="${item.lat}" data-lng="${item.lng}" style="
-                                    padding: 6px 8px;
-                                    background: #3b82f6;
-                                    color: white;
-                                    border: none;
-                                    border-radius: 4px;
-                                    cursor: pointer;
-                                    font-size: 11px;
-                                    font-weight: 600;
-                                ">
+                                <button 
+                                    class="move-project-btn" 
+                                    data-project-id="${item.id}" 
+                                    data-lat="${item.lat}" 
+                                    data-lng="${item.lng}" 
+                                    type="button"
+                                    style="
+                                        padding: 8px 10px;
+                                        background: #3b82f6;
+                                        color: white;
+                                        border: none;
+                                        border-radius: 4px;
+                                        cursor: pointer;
+                                        font-size: 11px;
+                                        font-weight: 600;
+                                        pointer-events: auto;
+                                        touch-action: manipulation;
+                                        user-select: none;
+                                    "
+                                    onclick="event.stopPropagation(); event.preventDefault(); moveProject('${item.id}', ${item.lat}, ${item.lng});"
+                                >
                                     📍 Mover
                                 </button>
-                                <button class="delete-project-btn" data-project-id="${item.id}" style="
-                                    padding: 6px 8px;
-                                    background: #ef4444;
-                                    color: white;
-                                    border: none;
-                                    border-radius: 4px;
-                                    cursor: pointer;
-                                    font-size: 11px;
-                                    font-weight: 600;
-                                ">
+                                <button 
+                                    class="delete-project-btn" 
+                                    data-project-id="${item.id}" 
+                                    type="button"
+                                    style="
+                                        padding: 8px 10px;
+                                        background: #ef4444;
+                                        color: white;
+                                        border: none;
+                                        border-radius: 4px;
+                                        cursor: pointer;
+                                        font-size: 11px;
+                                        font-weight: 600;
+                                        pointer-events: auto;
+                                        touch-action: manipulation;
+                                        user-select: none;
+                                    "
+                                    onclick="event.stopPropagation(); event.preventDefault(); deleteProject('${item.id}');"
+                                >
                                     🗑️ Borrar
                                 </button>
                             </div>
@@ -2233,47 +2271,75 @@
         }
 
         async function editProject(projectId) {
-            // Verificar permisos
-            const project = await getProjectById(projectId);
-            if (!project) {
-                alert('❌ Proyecto no encontrado');
-                return;
+            console.log('[EDIT PROJECT] Iniciando edición de proyecto:', projectId);
+            
+            try {
+                // Verificar permisos
+                const project = await getProjectById(projectId);
+                
+                if (!project) {
+                    console.error('[EDIT PROJECT] Proyecto no encontrado:', projectId);
+                    alert('❌ Proyecto no encontrado');
+                    return;
+                }
+                
+                console.log('[EDIT PROJECT] Proyecto cargado:', project);
+                
+                const isAdmin = currentUser && currentUser.email === 'storresperdigon@politicas.unam.mx';
+                const isOwner = currentUser && project.user_id === currentUser.id;
+                
+                console.log('[EDIT PROJECT] Permisos:', { isAdmin, isOwner, currentUserEmail: currentUser?.email });
+                
+                if (!isAdmin && !isOwner) {
+                    console.error('[EDIT PROJECT] Sin permisos para editar');
+                    alert('❌ No tienes permisos para editar este proyecto');
+                    return;
+                }
+                
+                // Cargar datos en el formulario
+                document.getElementById('edit-project-id').value = project.id;
+                document.getElementById('edit-project-nombre').value = project.nombre_proyecto || '';
+                document.getElementById('edit-project-descripcion').value = project.descripcion || '';
+                document.getElementById('edit-project-mia').value = project.mia || '';
+                document.getElementById('edit-project-irregularidad').value = project.irregularidad || '';
+                document.getElementById('edit-project-lat').value = project.lat || '';
+                document.getElementById('edit-project-lng').value = project.lng || '';
+                
+                // Limpiar mensajes anteriores
+                document.getElementById('edit-project-error').style.display = 'none';
+                document.getElementById('edit-project-success').style.display = 'none';
+                
+                console.log('[EDIT PROJECT] Mostrando modal de edición');
+                
+                // Mostrar modal
+                document.getElementById('edit-project-modal').style.display = 'flex';
+            } catch (error) {
+                console.error('[EDIT PROJECT] Error:', error);
+                alert('❌ Error al cargar proyecto: ' + error.message);
             }
-            
-            const isAdmin = currentUser && currentUser.email === 'storresperdigon@politicas.unam.mx';
-            const isOwner = currentUser && project.user_id === currentUser.id;
-            
-            if (!isAdmin && !isOwner) {
-                alert('❌ No tienes permisos para editar este proyecto');
-                return;
-            }
-            
-            // Cargar datos en el formulario
-            document.getElementById('edit-project-id').value = project.id;
-            document.getElementById('edit-project-nombre').value = project.nombre_proyecto;
-            document.getElementById('edit-project-descripcion').value = project.descripcion || '';
-            document.getElementById('edit-project-mia').value = project.mia || '';
-            document.getElementById('edit-project-irregularidad').value = project.irregularidad || '';
-            document.getElementById('edit-project-lat').value = project.lat;
-            document.getElementById('edit-project-lng').value = project.lng;
-            
-            // Mostrar modal
-            document.getElementById('edit-project-modal').style.display = 'flex';
         }
 
         async function getProjectById(projectId) {
-            const { data, error } = await supabaseClient
-                .from('proyectos_colaborativos')
-                .select('*')
-                .eq('id', projectId)
-                .single();
+            console.log('[GET PROJECT] Buscando proyecto ID:', projectId);
             
-            if (error) {
-                console.error('Error obteniendo proyecto:', error);
+            try {
+                const { data, error } = await supabaseClient
+                    .from('proyectos_colaborativos')
+                    .select('*')
+                    .eq('id', projectId)
+                    .single();
+                
+                if (error) {
+                    console.error('[GET PROJECT] Error de Supabase:', error);
+                    return null;
+                }
+                
+                console.log('[GET PROJECT] Proyecto encontrado:', data);
+                return data;
+            } catch (e) {
+                console.error('[GET PROJECT] Excepción:', e);
                 return null;
             }
-            
-            return data;
         }
 
         async function updateProject(projectId, projectData) {
@@ -4414,7 +4480,10 @@
             document.addEventListener('click', (e) => {
                 // Botón de editar proyecto
                 if (e.target.classList.contains('edit-project-btn')) {
+                    e.preventDefault();
+                    e.stopPropagation();
                     const projectId = e.target.getAttribute('data-project-id');
+                    console.log('[EDIT] Click en botón editar, proyecto ID:', projectId);
                     if (projectId) {
                         editProject(projectId);
                     }
@@ -4422,9 +4491,12 @@
                 
                 // Botón de mover proyecto
                 if (e.target.classList.contains('move-project-btn')) {
+                    e.preventDefault();
+                    e.stopPropagation();
                     const projectId = e.target.getAttribute('data-project-id');
                     const lat = parseFloat(e.target.getAttribute('data-lat'));
                     const lng = parseFloat(e.target.getAttribute('data-lng'));
+                    console.log('[MOVE] Click en botón mover, proyecto ID:', projectId);
                     if (projectId) {
                         moveProject(projectId, lat, lng);
                     }
@@ -4432,7 +4504,10 @@
                 
                 // Botón de borrar proyecto
                 if (e.target.classList.contains('delete-project-btn')) {
+                    e.preventDefault();
+                    e.stopPropagation();
                     const projectId = e.target.getAttribute('data-project-id');
+                    console.log('[DELETE] Click en botón borrar, proyecto ID:', projectId);
                     if (projectId) {
                         deleteProject(projectId);
                     }
