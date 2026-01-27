@@ -1547,6 +1547,44 @@
         const SUPABASE_URL = 'https://mrniyxyurgbpfqfuzgws.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ybml5eHl1cmdicGZxZnV6Z3dzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0MTI1OTgsImV4cCI6MjA4MDk4ODU5OH0.tkZIuDNUreGSqLL0JvuzJepZEfducQ3L5N4BS7Jxv4M';
 
+        // ========== FUNCIONES PARA MODAL DE BIENVENIDA (SCOPE GLOBAL) ==========
+        window.openWelcome = function() {
+            const modal = document.getElementById('welcome-modal');
+            modal.classList.remove('closing');
+            modal.style.display = 'flex';
+        }
+
+        window.closeWelcome = function() {
+            const modal = document.getElementById('welcome-modal');
+            modal.classList.add('closing');
+            
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 800);
+        }
+
+        window.togglePanel = function(panelId) {
+            const panel = document.getElementById(panelId);
+            const icon = document.getElementById(panelId === 'control-panel' ? 'control-toggle-icon' : 'legends-toggle-icon');
+            
+            if (panel.classList.contains('panel-minimized')) {
+                panel.classList.remove('panel-minimized');
+                icon.textContent = '−';
+            } else {
+                panel.classList.add('panel-minimized');
+                icon.textContent = '+';
+            }
+        }
+
+        window.toggleAllLayers = function() {
+            const checkboxes = document.querySelectorAll('.layer-control input[type="checkbox"]');
+            const firstChecked = checkboxes[0].checked;
+            checkboxes.forEach(cb => {
+                cb.checked = !firstChecked;
+                cb.dispatchEvent(new Event('change'));
+            });
+        }
+
         // Definir proyecciones para conversión de coordenadas
         // EPSG:32616 es UTM Zone 16N (usado en Quintana Roo, México)
         const UTM_ZONE_16N = '+proj=utm +zone=16 +datum=WGS84 +units=m +no_defs';
@@ -1641,21 +1679,6 @@
         };
 
         // ========== FUNCIONES PARA MODAL DE BIENVENIDA ==========
-        function openWelcome() {
-            const modal = document.getElementById('welcome-modal');
-            modal.classList.remove('closing');
-            modal.style.display = 'flex';
-        }
-
-        function closeWelcome() {
-            const modal = document.getElementById('welcome-modal');
-            modal.classList.add('closing');
-            
-            setTimeout(() => {
-                modal.style.display = 'none';
-            }, 800);
-        }
-
         // ========== FUNCIONES PARA ARRASTRE DE PANELES MINIMIZADOS ==========
         let isDragging = false;
         let currentPanel = null;
@@ -4949,29 +4972,6 @@
             else map.removeLayer(layerGroups.fraccionamientos);
         });
         FIN TEMPORALMENTE DESACTIVADO */
-
-        // Función para minimizar/maximizar paneles
-        function togglePanel(panelId) {
-            const panel = document.getElementById(panelId);
-            const icon = document.getElementById(panelId === 'control-panel' ? 'control-toggle-icon' : 'legends-toggle-icon');
-            
-            if (panel.classList.contains('panel-minimized')) {
-                panel.classList.remove('panel-minimized');
-                icon.textContent = '−';
-            } else {
-                panel.classList.add('panel-minimized');
-                icon.textContent = '+';
-            }
-        }
-
-        function toggleAllLayers() {
-            const checkboxes = document.querySelectorAll('.layer-control input[type="checkbox"]');
-            const firstChecked = checkboxes[0].checked;
-            checkboxes.forEach(cb => {
-                cb.checked = !firstChecked;
-                cb.dispatchEvent(new Event('change'));
-            });
-        }
 
         // Iniciar al cargar
         window.addEventListener('load', async () => {
