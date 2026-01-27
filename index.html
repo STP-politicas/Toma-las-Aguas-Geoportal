@@ -1250,7 +1250,7 @@
         <div class="layer-control">
             <input type="checkbox" id="layer-nucleos-agrarios" checked>
             <label for="layer-nucleos-agrarios">
-                <span class="color-indicator" style="background-color: #92400e;"></span>
+                <span class="color-indicator" style="background-color: #10b981;"></span>
                 Núcleos Agrarios (RAN)
             </label>
             <span class="layer-count" id="count-nucleos-agrarios">0</span>
@@ -1258,7 +1258,7 @@
         <div class="layer-control">
             <input type="checkbox" id="layer-asentamientos-humanos" checked>
             <label for="layer-asentamientos-humanos">
-                <span class="color-indicator" style="background-color: #64748b;"></span>
+                <span class="color-indicator" style="background-color: #fbbf24;"></span>
                 Asentamientos Humanos (RAN)
             </label>
             <span class="layer-count" id="count-asentamientos-humanos">0</span>
@@ -1626,10 +1626,10 @@
             tierrasEjidales: {
                 'comunal': '#a855f7',        // Púrpura
                 'parcelada': '#f97316',      // Naranja
-                'nucleos': '#92400e',        // Marrón tierra
-                'asentamientos': '#64748b',  // Gris pizarra
                 'default': '#8b5cf6'
             },
+            nucleosAgrarios: '#10b981',      // Verde esmeralda
+            asentamientosRAN: '#fbbf24',     // Amarillo ámbar
             fraccionamientos: '#dc2626',     // Rojo intenso (alerta)
             fallasINEGI: '#9f7aea',
             fallasCENAPRED: '#ed64a6',
@@ -4317,7 +4317,21 @@
             console.log('Total items:', data.length);
             if (data.length > 0) {
                 console.log('Primer item completo:', data[0]);
-                console.log('Campos disponibles:', Object.keys(data[0]));
+                console.log('Todos los campos disponibles:', Object.keys(data[0]));
+                
+                // Mostrar todos los valores de campos posibles
+                const testItem = data[0];
+                console.log('Valores de campos potenciales:');
+                console.log('- riesgo:', testItem.riesgo);
+                console.log('- RIESGO:', testItem.RIESGO);
+                console.log('- nivel:', testItem.nivel);
+                console.log('- NIVEL:', testItem.NIVEL);
+                console.log('- suscept:', testItem.suscept);
+                console.log('- SUSCEPT:', testItem.SUSCEPT);
+                console.log('- clase:', testItem.clase);
+                console.log('- CLASE:', testItem.CLASE);
+                console.log('- tipo:', testItem.tipo);
+                console.log('- TIPO:', testItem.TIPO);
             }
             
             let rendered = 0;
@@ -4326,15 +4340,20 @@
                 if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
 
                 // Probar múltiples variaciones del campo de riesgo
-                const riesgo = item.riesgo || item.RIESGO || item.Riesgo || 
+                const riesgo = item.suscept || item.SUSCEPT || item.Suscept ||
+                              item.riesgo || item.RIESGO || item.Riesgo || 
                               item.nivel || item.NIVEL || item.Nivel ||
+                              item.clase || item.CLASE || item.Clase ||
+                              item.tipo || item.TIPO || item.Tipo ||
                               item.nivel_riesgo || item.NIVEL_RIESGO ||
                               item.colapso || item.COLAPSO ||
                               item.intensidad || item.INTENSIDAD || 'Sin información';
+                
                 const color = COLORS.colapsoKarst[riesgo] || COLORS.colapsoKarst.default;
 
                 if (index === 0) {
                     console.log('Campo de riesgo detectado:', riesgo);
+                    console.log('Color asignado:', color);
                 }
 
                 const coords = parseGeoJSON(geom);
@@ -4353,7 +4372,7 @@
                             <div class="custom-popup-divider" style="border-color: ${color};">
                                 <p><strong>Nivel de Riesgo:</strong> ${riesgo}</p>
                                 ${item.uga || item.UGA ? `<p><strong>UGA:</strong> ${item.uga || item.UGA}</p>` : ''}
-                                ${item.descripcion || item.DESCRIPCION ? `<p><strong>Descripción:</strong> ${item.descripcion || item.DESCRIPCION}</p>` : ''}
+                                ${item.descripcion || item.DESCRIPCION || item.desc || item.DESC ? `<p><strong>Descripción:</strong> ${item.descripcion || item.DESCRIPCION || item.desc || item.DESC}</p>` : ''}
                                 <p style="margin-top: 10px; padding: 10px; background: #fef3c7; border-left: 4px solid #f59e0b; font-size: 12px;">
                                     <strong>⚠️ Advertencia:</strong> Esta zona presenta riesgo de colapso del terreno. No recomendado para construcción de infraestructura pesada.
                                 </p>
@@ -4369,6 +4388,14 @@
                     polygon.on('mouseout', function() {
                         this.setStyle({ fillOpacity: 0.5, weight: 2 });
                     });
+
+                    polygon.addTo(layerGroups.colapsoKarst);
+                    rendered++;
+                }
+            });
+            
+            console.log(`✓ ${rendered} polígonos de colapso por karstificación renderizados`);
+        }                    });
 
                     polygon.addTo(layerGroups.colapsoKarst);
                     rendered++;
@@ -4543,7 +4570,7 @@
                 const geom = parseGeometry(item);
                 if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
 
-                const color = COLORS.tierrasEjidales.nucleos;
+                const color = COLORS.nucleosAgrarios;
 
                 const coords = parseGeoJSON(geom);
                 if (coords && coords.length > 0) {
@@ -4566,8 +4593,8 @@
                                 ${item.municipio || item.MUNICIPIO ? `<p><strong>Municipio:</strong> ${item.municipio || item.MUNICIPIO}</p>` : ''}
                                 ${item.num_certif || item.NUM_CERTIF ? `<p><strong>Número de Certificación:</strong> ${item.num_certif || item.NUM_CERTIF}</p>` : ''}
                                 
-                                <div style="margin-top: 15px; padding: 12px; background: #fef9e7; border-left: 4px solid #92400e; font-size: 12px;">
-                                    <strong style="color: #78350f;">📋 NÚCLEO AGRARIO CERTIFICADO POR RAN</strong>
+                                <div style="margin-top: 15px; padding: 12px; background: #ecfdf5; border-left: 4px solid #10b981; font-size: 12px;">
+                                    <strong style="color: #047857;">📋 NÚCLEO AGRARIO CERTIFICADO POR RAN</strong>
                                     <p style="margin: 8px 0 0 0; line-height: 1.4;">
                                         Unidad básica de organización agraria que agrupa ejidos o comunidades. Incluye todas las tierras (comunales, parceladas y asentamiento humano) bajo la jurisdicción de una asamblea.
                                     </p>
@@ -4619,7 +4646,7 @@
                 const geom = parseGeometry(item);
                 if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
 
-                const color = COLORS.tierrasEjidales.asentamientos;
+                const color = COLORS.asentamientosRAN;
 
                 const coords = parseGeoJSON(geom);
                 if (coords && coords.length > 0) {
@@ -4641,8 +4668,8 @@
                                 ${item.superficie || item.SUPERFICIE || item.sup_ha || item.SUP_HA ? `<p><strong>Superficie:</strong> ${(item.superficie || item.SUPERFICIE || item.sup_ha || item.SUP_HA).toLocaleString()} ha</p>` : ''}
                                 ${item.municipio || item.MUNICIPIO ? `<p><strong>Municipio:</strong> ${item.municipio || item.MUNICIPIO}</p>` : ''}
                                 
-                                <div style="margin-top: 15px; padding: 12px; background: #f1f5f9; border-left: 4px solid #64748b; font-size: 12px;">
-                                    <strong style="color: #475569;">🏠 ZONA DE ASENTAMIENTO HUMANO</strong>
+                                <div style="margin-top: 15px; padding: 12px; background: #fef3c7; border-left: 4px solid #fbbf24; font-size: 12px;">
+                                    <strong style="color: #d97706;">🏠 ZONA DE ASENTAMIENTO HUMANO</strong>
                                     <p style="margin: 8px 0 0 0; line-height: 1.4;">
                                         Área destinada para la vivienda de ejidatarios y sus familias dentro del ejido. Conocida como "el pueblo" o "la cabecera ejidal". 
                                         Incluye solares urbanos, infraestructura comunitaria, escuelas, clínicas y espacios públicos.
