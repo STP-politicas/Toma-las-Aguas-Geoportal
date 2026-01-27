@@ -1180,6 +1180,14 @@
             <span class="layer-count" id="count-karstificacion">0</span>
         </div>
         <div class="layer-control">
+            <input type="checkbox" id="layer-colapso-karst" checked>
+            <label for="layer-colapso-karst">
+                <span class="color-indicator" style="background: linear-gradient(90deg, #ff00ff, #00ffff, #ffff00);"></span>
+                ⚠️ Riesgo de Colapso por Karstificación
+            </label>
+            <span class="layer-count" id="count-colapso-karst">0</span>
+        </div>
+        <div class="layer-control">
             <input type="checkbox" id="layer-fallas-inegi" checked>
             <label for="layer-fallas-inegi">
                 <span class="color-indicator" style="background-color: #9f7aea;"></span>
@@ -1236,6 +1244,24 @@
                 Pozos con Protección
             </label>
             <span class="layer-count" id="count-pozos-con">0</span>
+        </div>
+
+        <h3>🏘️ Tierras Ejidales</h3>
+        <div class="layer-control">
+            <input type="checkbox" id="layer-tierras-comunales" checked>
+            <label for="layer-tierras-comunales">
+                <span class="color-indicator" style="background-color: #a855f7;"></span>
+                Zonas Comunales Ejidales
+            </label>
+            <span class="layer-count" id="count-tierras-comunales">0</span>
+        </div>
+        <div class="layer-control">
+            <input type="checkbox" id="layer-tierras-parceladas" checked>
+            <label for="layer-tierras-parceladas">
+                <span class="color-indicator" style="background-color: #f97316;"></span>
+                Zonas Parceladas
+            </label>
+            <span class="layer-count" id="count-tierras-parceladas">0</span>
         </div>
     </div>
 
@@ -1562,6 +1588,19 @@
                 'nubes': '#0369a1',                                // Sky 800
                 'zona de cambio de uso de suelo': '#7dd3fc',       // Sky 300 (azul claro)
                 'default': '#718096'
+            },
+            colapsoKarst: {
+                'Muy Alto': '#ff00ff',      // Magenta brillante
+                'Alto': '#00ffff',           // Cyan neón
+                'Medio': '#ffff00',          // Amarillo brillante
+                'Bajo': '#ff1493',           // Rosa profundo
+                'Muy Bajo': '#00ff00',       // Verde neón
+                'default': '#ff69b4'         // Rosa chicle
+            },
+            tierrasEjidales: {
+                'comunal': '#a855f7',        // Púrpura
+                'parcelada': '#f97316',      // Naranja
+                'default': '#8b5cf6'
             },
             fallasINEGI: '#9f7aea',
             fallasCENAPRED: '#ed64a6',
@@ -2529,13 +2568,16 @@
                     sascab: L.layerGroup(),
                     rios: L.layerGroup(),
                     karstificacion: L.layerGroup(),
+                    colapsoKarst: L.layerGroup(),
                     fallasINEGI: L.layerGroup(),
                     fallasCENAPRED: L.layerGroup(),
                     poel: L.layerGroup(),
                     socioeco: L.layerGroup(),
                     municipio: L.layerGroup(),
                     pozosSinProteccion: L.layerGroup(),
-                    pozosConProteccion: L.layerGroup()
+                    pozosConProteccion: L.layerGroup(),
+                    tierrasComunales: L.layerGroup(),
+                    tierrasParceladas: L.layerGroup()
                 };
                 
                 // Crear mapa Leaflet
@@ -2834,6 +2876,27 @@
                 }
             } catch (e) { console.error('Error karstificación:', e); }
 
+            // COLAPSO POR KARSTIFICACIÓN
+            try {
+                updateLoading('Cargando riesgo de colapso por karstificación...');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('Colapso por karstificacion — informacin_colapso_por_uga_copy')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        updateLayerCount('colapso-karst', data.length);
+                        renderColapsoKarst(data);
+                        console.log(`✓ ${data.length} polígonos de colapso por karstificación cargados`);
+                    }
+                }
+            } catch (e) { console.error('Error colapso por karstificación:', e); }
+
             // FALLAS INEGI
             try {
                 updateLoading('Cargando fallas INEGI...');
@@ -2996,6 +3059,48 @@
                     }
                 }
             } catch (e) { console.error('Error POEL:', e); }
+
+            // TIERRAS COMUNALES EJIDALES
+            try {
+                updateLoading('Cargando zonas comunales ejidales...');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('zonas comunales ejidales — zonas_comunales_ran_copy')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        updateLayerCount('tierras-comunales', data.length);
+                        renderTierrasComunales(data);
+                        console.log(`✓ ${data.length} zonas comunales ejidales cargadas`);
+                    }
+                }
+            } catch (e) { console.error('Error tierras comunales:', e); }
+
+            // TIERRAS PARCELADAS
+            try {
+                updateLoading('Cargando zonas parceladas...');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('zonas parceladas — zo_parceladas_ran_copy')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        updateLayerCount('tierras-parceladas', data.length);
+                        renderTierrasParceladas(data);
+                        console.log(`✓ ${data.length} zonas parceladas cargadas`);
+                    }
+                }
+            } catch (e) { console.error('Error tierras parceladas:', e); }
         }
 
         function renderCuerposAgua(data) {
@@ -4112,6 +4217,165 @@
             console.log(`✓ Rendered ${rendered} of ${data.length} pozos con protección`);
         }
 
+        function renderColapsoKarst(data) {
+            console.log('=== RENDERIZANDO COLAPSO POR KARSTIFICACIÓN ===');
+            console.log('Total items:', data.length);
+            
+            let rendered = 0;
+            data.forEach((item, index) => {
+                const geom = parseGeometry(item);
+                if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+
+                const riesgo = item.riesgo || item.RIESGO || item.Riesgo || 'default';
+                const color = COLORS.colapsoKarst[riesgo] || COLORS.colapsoKarst.default;
+
+                const coords = parseGeoJSON(geom);
+                if (coords && coords.length > 0) {
+                    const polygon = L.polygon(coords, {
+                        color: color,
+                        fillColor: color,
+                        fillOpacity: 0.5,
+                        weight: 2,
+                        opacity: 0.9
+                    });
+
+                    const popupContent = `
+                        <div class="custom-popup">
+                            <h3 style="color: ${color};">⚠️ Riesgo de Colapso por Karstificación</h3>
+                            <div class="custom-popup-divider" style="border-color: ${color};">
+                                <p><strong>Nivel de Riesgo:</strong> ${riesgo}</p>
+                                ${item.uga || item.UGA ? `<p><strong>UGA:</strong> ${item.uga || item.UGA}</p>` : ''}
+                                ${item.descripcion || item.DESCRIPCION ? `<p><strong>Descripción:</strong> ${item.descripcion || item.DESCRIPCION}</p>` : ''}
+                                <p style="margin-top: 10px; padding: 10px; background: #fef3c7; border-left: 4px solid #f59e0b; font-size: 12px;">
+                                    <strong>⚠️ Advertencia:</strong> Esta zona presenta riesgo de colapso del terreno. No recomendado para construcción de infraestructura pesada.
+                                </p>
+                            </div>
+                        </div>
+                    `;
+
+                    polygon.bindPopup(popupContent);
+                    
+                    polygon.on('mouseover', function() {
+                        this.setStyle({ fillOpacity: 0.7, weight: 3 });
+                    });
+                    polygon.on('mouseout', function() {
+                        this.setStyle({ fillOpacity: 0.5, weight: 2 });
+                    });
+
+                    polygon.addTo(layerGroups.colapsoKarst);
+                    rendered++;
+                }
+            });
+            
+            console.log(`✓ ${rendered} polígonos de colapso por karstificación renderizados`);
+        }
+
+        function renderTierrasComunales(data) {
+            console.log('=== RENDERIZANDO TIERRAS COMUNALES EJIDALES ===');
+            console.log('Total items:', data.length);
+            
+            let rendered = 0;
+            data.forEach((item, index) => {
+                const geom = parseGeometry(item);
+                if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+
+                const color = COLORS.tierrasEjidales.comunal;
+
+                const coords = parseGeoJSON(geom);
+                if (coords && coords.length > 0) {
+                    const polygon = L.polygon(coords, {
+                        color: color,
+                        fillColor: color,
+                        fillOpacity: 0.4,
+                        weight: 2,
+                        opacity: 0.8
+                    });
+
+                    const popupContent = `
+                        <div class="custom-popup">
+                            <h3 style="color: ${color};">🏘️ Zona Comunal Ejidal</h3>
+                            <div class="custom-popup-divider" style="border-color: ${color};">
+                                <p><strong>Tipo:</strong> Tierra Comunal</p>
+                                ${item.ejido || item.EJIDO ? `<p><strong>Ejido:</strong> ${item.ejido || item.EJIDO}</p>` : ''}
+                                ${item.nucleo || item.NUCLEO ? `<p><strong>Núcleo Agrario:</strong> ${item.nucleo || item.NUCLEO}</p>` : ''}
+                                ${item.superficie || item.SUPERFICIE ? `<p><strong>Superficie:</strong> ${(item.superficie || item.SUPERFICIE).toLocaleString()} ha</p>` : ''}
+                                <p style="margin-top: 10px; padding: 10px; background: #f3e8ff; border-left: 4px solid #a855f7; font-size: 12px;">
+                                    <strong>ℹ️ Información:</strong> Tierras de uso colectivo del ejido. Cualquier desarrollo requiere consulta y aprobación de la asamblea ejidal.
+                                </p>
+                            </div>
+                        </div>
+                    `;
+
+                    polygon.bindPopup(popupContent);
+                    
+                    polygon.on('mouseover', function() {
+                        this.setStyle({ fillOpacity: 0.6, weight: 3 });
+                    });
+                    polygon.on('mouseout', function() {
+                        this.setStyle({ fillOpacity: 0.4, weight: 2 });
+                    });
+
+                    polygon.addTo(layerGroups.tierrasComunales);
+                    rendered++;
+                }
+            });
+            
+            console.log(`✓ ${rendered} zonas comunales ejidales renderizadas`);
+        }
+
+        function renderTierrasParceladas(data) {
+            console.log('=== RENDERIZANDO TIERRAS PARCELADAS ===');
+            console.log('Total items:', data.length);
+            
+            let rendered = 0;
+            data.forEach((item, index) => {
+                const geom = parseGeometry(item);
+                if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+
+                const color = COLORS.tierrasEjidales.parcelada;
+
+                const coords = parseGeoJSON(geom);
+                if (coords && coords.length > 0) {
+                    const polygon = L.polygon(coords, {
+                        color: color,
+                        fillColor: color,
+                        fillOpacity: 0.4,
+                        weight: 2,
+                        opacity: 0.8
+                    });
+
+                    const popupContent = `
+                        <div class="custom-popup">
+                            <h3 style="color: ${color};">🏘️ Zona Parcelada</h3>
+                            <div class="custom-popup-divider" style="border-color: ${color};">
+                                <p><strong>Tipo:</strong> Tierra Parcelada</p>
+                                ${item.ejido || item.EJIDO ? `<p><strong>Ejido:</strong> ${item.ejido || item.EJIDO}</p>` : ''}
+                                ${item.nucleo || item.NUCLEO ? `<p><strong>Núcleo Agrario:</strong> ${item.nucleo || item.NUCLEO}</p>` : ''}
+                                ${item.superficie || item.SUPERFICIE ? `<p><strong>Superficie:</strong> ${(item.superficie || item.SUPERFICIE).toLocaleString()} ha</p>` : ''}
+                                <p style="margin-top: 10px; padding: 10px; background: #fed7aa; border-left: 4px solid #f97316; font-size: 12px;">
+                                    <strong>ℹ️ Información:</strong> Tierras parceladas del ejido para uso individual de ejidatarios. Cualquier cambio de uso de suelo requiere autorización ejidal y trámites legales.
+                                </p>
+                            </div>
+                        </div>
+                    `;
+
+                    polygon.bindPopup(popupContent);
+                    
+                    polygon.on('mouseover', function() {
+                        this.setStyle({ fillOpacity: 0.6, weight: 3 });
+                    });
+                    polygon.on('mouseout', function() {
+                        this.setStyle({ fillOpacity: 0.4, weight: 2 });
+                    });
+
+                    polygon.addTo(layerGroups.tierrasParceladas);
+                    rendered++;
+                }
+            });
+            
+            console.log(`✓ ${rendered} zonas parceladas renderizadas`);
+        }
+
         // Controles de capas
         document.getElementById('layer-proyectos').addEventListener('change', (e) => {
             if (e.target.checked) map.addLayer(layerGroups.proyectos);
@@ -4216,6 +4480,21 @@
         document.getElementById('layer-pozos-con').addEventListener('change', (e) => {
             if (e.target.checked) map.addLayer(layerGroups.pozosConProteccion);
             else map.removeLayer(layerGroups.pozosConProteccion);
+        });
+
+        document.getElementById('layer-colapso-karst').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.colapsoKarst);
+            else map.removeLayer(layerGroups.colapsoKarst);
+        });
+
+        document.getElementById('layer-tierras-comunales').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.tierrasComunales);
+            else map.removeLayer(layerGroups.tierrasComunales);
+        });
+
+        document.getElementById('layer-tierras-parceladas').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.tierrasParceladas);
+            else map.removeLayer(layerGroups.tierrasParceladas);
         });
 
         // Función para minimizar/maximizar paneles
