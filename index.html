@@ -1246,7 +1246,8 @@
             <span class="layer-count" id="count-pozos-con">0</span>
         </div>
 
-        <h3>🏘️ Tierras Ejidales</h3>
+        <!-- TEMPORALMENTE DESACTIVADO PARA DEBUG
+        <h3>🏘️ Tierras Ejidales (RAN)</h3>
         <div class="layer-control">
             <input type="checkbox" id="layer-nucleos-agrarios" checked>
             <label for="layer-nucleos-agrarios">
@@ -1289,6 +1290,7 @@
             </label>
             <span class="layer-count" id="count-fraccionamientos">0</span>
         </div>
+        FIN TEMPORALMENTE DESACTIVADO -->
     </div>
 
     <!-- Panel de Leyendas -->
@@ -3092,8 +3094,8 @@
                 }
             } catch (e) { console.error('Error POEL:', e); }
 
-            // TIERRAS COMUNALES EJIDALES
-            try {
+            // TIERRAS COMUNALES EJIDALES - TEMPORALMENTE DESACTIVADO PARA DEBUG
+            /* try {
                 updateLoading('Cargando zonas comunales ejidales...');
                 const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('zonas comunales ejidales — zonas_comunales_ran_copy')}?select=*`, {
                     headers: {
@@ -3111,10 +3113,10 @@
                         console.log(`✓ ${data.length} zonas comunales ejidales cargadas`);
                     }
                 }
-            } catch (e) { console.error('Error tierras comunales:', e); }
+            } catch (e) { console.error('Error tierras comunales:', e); } */
 
-            // NÚCLEOS AGRARIOS (RAN)
-            try {
+            // NÚCLEOS AGRARIOS (RAN) - TEMPORALMENTE DESACTIVADO PARA DEBUG
+            /* try {
                 updateLoading('Cargando núcleos agrarios (RAN)...');
                 const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('nucleos agrarios (ran) — zo_nucleosagrarios_ran_copy')}?select=*`, {
                     headers: {
@@ -3132,10 +3134,10 @@
                         console.log(`✓ ${data.length} núcleos agrarios cargados`);
                     }
                 }
-            } catch (e) { console.error('Error núcleos agrarios:', e); }
+            } catch (e) { console.error('Error núcleos agrarios:', e); } */
 
-            // ASENTAMIENTOS HUMANOS (RAN)
-            try {
+            // ASENTAMIENTOS HUMANOS (RAN) - TEMPORALMENTE DESACTIVADO PARA DEBUG
+            /* try {
                 updateLoading('Cargando asentamientos humanos (RAN)...');
                 const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('zona asentamientos humanos (RAN) — zo_asentamientoshumanos_ra')}?select=*`, {
                     headers: {
@@ -3153,10 +3155,10 @@
                         console.log(`✓ ${data.length} asentamientos humanos cargados`);
                     }
                 }
-            } catch (e) { console.error('Error asentamientos humanos:', e); }
+            } catch (e) { console.error('Error asentamientos humanos:', e); } */
 
-            // TIERRAS PARCELADAS
-            try {
+            // TIERRAS PARCELADAS - TEMPORALMENTE DESACTIVADO PARA DEBUG
+            /* try {
                 updateLoading('Cargando zonas parceladas...');
                 const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('zonas parceladas — zo_parceladas_ran_copy')}?select=*`, {
                     headers: {
@@ -3174,10 +3176,10 @@
                         console.log(`✓ ${data.length} zonas parceladas cargadas`);
                     }
                 }
-            } catch (e) { console.error('Error tierras parceladas:', e); }
+            } catch (e) { console.error('Error tierras parceladas:', e); } */
 
-            // FRACCIONAMIENTOS A LEGALIZAR (POEL 2024)
-            try {
+            // FRACCIONAMIENTOS A LEGALIZAR (POEL 2024) - TEMPORALMENTE DESACTIVADO PARA DEBUG
+            /* try {
                 updateLoading('Cargando fraccionamientos a legalizar...');
                 const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('fraccionamiento que busca legalizar el poel nuevo — fracc_poe')}?select=*`, {
                     headers: {
@@ -3195,7 +3197,7 @@
                         console.log(`✓ ${data.length} fraccionamientos a legalizar cargados`);
                     }
                 }
-            } catch (e) { console.error('Error fraccionamientos:', e); }
+            } catch (e) { console.error('Error fraccionamientos:', e); } */
         }
 
         function renderCuerposAgua(data) {
@@ -4931,6 +4933,7 @@
             else map.removeLayer(layerGroups.tierrasParceladas);
         });
 
+        /* TEMPORALMENTE DESACTIVADO PARA DEBUG
         document.getElementById('layer-nucleos-agrarios').addEventListener('change', (e) => {
             if (e.target.checked) map.addLayer(layerGroups.nucleosAgrarios);
             else map.removeLayer(layerGroups.nucleosAgrarios);
@@ -4945,6 +4948,7 @@
             if (e.target.checked) map.addLayer(layerGroups.fraccionamientos);
             else map.removeLayer(layerGroups.fraccionamientos);
         });
+        FIN TEMPORALMENTE DESACTIVADO */
 
         // Función para minimizar/maximizar paneles
         function togglePanel(panelId) {
