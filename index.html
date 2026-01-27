@@ -3081,6 +3081,71 @@
                 }
             } catch (e) { console.error('Error tierras comunales:', e); }
 
+
+            // NÚCLEOS AGRARIOS (RAN)
+            try {
+                updateLoading('Cargando núcleos agrarios (RAN).');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('zo_nucleosagrarios_ran_copy')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        updateLayerCount('nucleos-ran', data.length);
+                        renderNucleosAgrarios(data);
+                        console.log(`✓ ${data.length} núcleos agrarios cargados`);
+                    }
+                }
+            } catch (e) { console.error('Error núcleos agrarios:', e); }
+
+            // ASENTAMIENTOS HUMANOS (RAN)
+            try {
+                updateLoading('Cargando asentamientos humanos (RAN).');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('zo_asentamientoshumanos_ra')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        updateLayerCount('asentamientos-ran', data.length);
+                        renderAsentamientosRAN(data);
+                        console.log(`✓ ${data.length} asentamientos RAN cargados`);
+                    }
+                }
+            } catch (e) { console.error('Error asentamientos RAN:', e); }
+
+            // FRACCIONAMIENTOS EN PROCESO DE LEGALIZACIÓN (POEL/PDU 2024)
+            try {
+                updateLoading('Cargando fraccionamientos en proceso de legalización.');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('fracc_poe')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        updateLayerCount('fracc-poel', data.length);
+                        renderFraccionamientosPOEL(data);
+                        console.log(`✓ ${data.length} fraccionamientos en regularización cargados`);
+                    }
+                }
+            } catch (e) { console.error('Error fraccionamientos POEL:', e); }
+
+
             // TIERRAS PARCELADAS
             try {
                 updateLoading('Cargando zonas parceladas...');
@@ -4226,7 +4291,18 @@
                 const geom = parseGeometry(item);
                 if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
 
-                const riesgo = item.riesgo || item.RIESGO || item.Riesgo || 'default';
+                let riesgoRaw = item.riesgo || item.RIESGO || item.Riesgo || '';
+let riesgo = riesgoRaw
+  .toString()
+  .trim()
+  .toLowerCase()
+  .normalize("NFD").replace(/[\u0300-\u036f]/g, '');
+
+if (riesgo.includes('muy')) riesgo = 'muy_alto';
+else if (riesgo.includes('alto')) riesgo = 'alto';
+else if (riesgo.includes('medio')) riesgo = 'medio';
+else if (riesgo.includes('bajo')) riesgo = 'bajo';
+else riesgo = 'sin_dato';
                 const color = COLORS.colapsoKarst[riesgo] || COLORS.colapsoKarst.default;
 
                 const coords = parseGeoJSON(geom);
@@ -5056,3 +5132,53 @@
     </script>
 </body>
 </html>
+
+function renderNucleosAgrarios(data) {
+    data.forEach(item => {
+        const geom = parseGeometry(item);
+        if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+
+        const coords = parseGeoJSON(geom);
+        if (!coords || coords.length === 0) return;
+
+        const color = '#2563eb';
+        const poly = L.polygon(coords, { color, fillColor: color, fillOpacity: 0.3, weight: 2 });
+        poly.bindPopup(`<h3>🏞️ Núcleo Agrario (RAN)</h3><p><strong>Nombre:</strong> ${item.nombre || item.NOMBRE || 'Sin dato'}</p>`);
+        poly.addTo(layerGroups.nucleosRan || layerGroups.municipio || map);
+    });
+}
+
+function renderAsentamientosRAN(data) {
+    data.forEach(item => {
+        const geom = parseGeometry(item);
+        if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+
+        const coords = parseGeoJSON(geom);
+        if (!coords || coords.length === 0) return;
+
+        const color = '#9333ea';
+        const poly = L.polygon(coords, { color, fillColor: color, fillOpacity: 0.3, weight: 2 });
+        poly.bindPopup(`<h3>🏘️ Asentamiento Humano (RAN)</h3><p><strong>Nombre:</strong> ${item.nombre || item.NOMBRE || 'Sin dato'}</p>`);
+        poly.addTo(layerGroups.asentamientosRan || layerGroups.municipio || map);
+    });
+}
+
+function renderFraccionamientosPOEL(data) {
+    data.forEach(item => {
+        const geom = parseGeometry(item);
+        if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+
+        const coords = parseGeoJSON(geom);
+        if (!coords || coords.length === 0) return;
+
+        const color = '#dc2626';
+        const poly = L.polygon(coords, { color, fillColor: color, fillOpacity: 0.4, weight: 2 });
+        poly.bindPopup(`
+            <h3>🏗️ Fraccionamiento en proceso de legalización</h3>
+            <p><strong>Nombre:</strong> ${item.nombre || item.NOMBRE || 'Sin dato'}</p>
+            <p><strong>Instrumento:</strong> POEL / PDU 2024</p>
+            <p style="color:#7f1d1d;"><strong>Advertencia:</strong> Proyecto aún no consolidado legalmente.</p>
+        `);
+        poly.addTo(layerGroups.fraccPOEL || layerGroups.municipio || map);
+    });
+}
