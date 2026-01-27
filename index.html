@@ -1248,6 +1248,22 @@
 
         <h3>🏘️ Tierras Ejidales</h3>
         <div class="layer-control">
+            <input type="checkbox" id="layer-nucleos-agrarios" checked>
+            <label for="layer-nucleos-agrarios">
+                <span class="color-indicator" style="background-color: #92400e;"></span>
+                Núcleos Agrarios (RAN)
+            </label>
+            <span class="layer-count" id="count-nucleos-agrarios">0</span>
+        </div>
+        <div class="layer-control">
+            <input type="checkbox" id="layer-asentamientos-humanos" checked>
+            <label for="layer-asentamientos-humanos">
+                <span class="color-indicator" style="background-color: #64748b;"></span>
+                Asentamientos Humanos (RAN)
+            </label>
+            <span class="layer-count" id="count-asentamientos-humanos">0</span>
+        </div>
+        <div class="layer-control">
             <input type="checkbox" id="layer-tierras-comunales" checked>
             <label for="layer-tierras-comunales">
                 <span class="color-indicator" style="background-color: #a855f7;"></span>
@@ -1262,6 +1278,16 @@
                 Zonas Parceladas
             </label>
             <span class="layer-count" id="count-tierras-parceladas">0</span>
+        </div>
+
+        <h3>🏗️ Desarrollo Urbano Municipal</h3>
+        <div class="layer-control">
+            <input type="checkbox" id="layer-fraccionamientos" checked>
+            <label for="layer-fraccionamientos">
+                <span class="color-indicator" style="background-color: #dc2626;"></span>
+                ⚠️ Fraccionamientos a Legalizar (POEL 2024)
+            </label>
+            <span class="layer-count" id="count-fraccionamientos">0</span>
         </div>
     </div>
 
@@ -1600,8 +1626,11 @@
             tierrasEjidales: {
                 'comunal': '#a855f7',        // Púrpura
                 'parcelada': '#f97316',      // Naranja
+                'nucleos': '#92400e',        // Marrón tierra
+                'asentamientos': '#64748b',  // Gris pizarra
                 'default': '#8b5cf6'
             },
+            fraccionamientos: '#dc2626',     // Rojo intenso (alerta)
             fallasINEGI: '#9f7aea',
             fallasCENAPRED: '#ed64a6',
             municipio: '#4a5568',
@@ -2577,7 +2606,10 @@
                     pozosSinProteccion: L.layerGroup(),
                     pozosConProteccion: L.layerGroup(),
                     tierrasComunales: L.layerGroup(),
-                    tierrasParceladas: L.layerGroup()
+                    tierrasParceladas: L.layerGroup(),
+                    nucleosAgrarios: L.layerGroup(),
+                    asentamientosHumanos: L.layerGroup(),
+                    fraccionamientos: L.layerGroup()
                 };
                 
                 // Crear mapa Leaflet
@@ -3081,6 +3113,48 @@
                 }
             } catch (e) { console.error('Error tierras comunales:', e); }
 
+            // NÚCLEOS AGRARIOS (RAN)
+            try {
+                updateLoading('Cargando núcleos agrarios (RAN)...');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('nucleos agrarios (ran) — zo_nucleosagrarios_ran_copy')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        updateLayerCount('nucleos-agrarios', data.length);
+                        renderNucleosAgrarios(data);
+                        console.log(`✓ ${data.length} núcleos agrarios cargados`);
+                    }
+                }
+            } catch (e) { console.error('Error núcleos agrarios:', e); }
+
+            // ASENTAMIENTOS HUMANOS (RAN)
+            try {
+                updateLoading('Cargando asentamientos humanos (RAN)...');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('zona asentamientos humanos (RAN) — zo_asentamientoshumanos_ra')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        updateLayerCount('asentamientos-humanos', data.length);
+                        renderAsentamientosHumanos(data);
+                        console.log(`✓ ${data.length} asentamientos humanos cargados`);
+                    }
+                }
+            } catch (e) { console.error('Error asentamientos humanos:', e); }
+
             // TIERRAS PARCELADAS
             try {
                 updateLoading('Cargando zonas parceladas...');
@@ -3101,6 +3175,27 @@
                     }
                 }
             } catch (e) { console.error('Error tierras parceladas:', e); }
+
+            // FRACCIONAMIENTOS A LEGALIZAR (POEL 2024)
+            try {
+                updateLoading('Cargando fraccionamientos a legalizar...');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('fraccionamiento que busca legalizar el poel nuevo — fracc_poe')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        updateLayerCount('fraccionamientos', data.length);
+                        renderFraccionamientos(data);
+                        console.log(`✓ ${data.length} fraccionamientos a legalizar cargados`);
+                    }
+                }
+            } catch (e) { console.error('Error fraccionamientos:', e); }
         }
 
         function renderCuerposAgua(data) {
@@ -4220,14 +4315,27 @@
         function renderColapsoKarst(data) {
             console.log('=== RENDERIZANDO COLAPSO POR KARSTIFICACIÓN ===');
             console.log('Total items:', data.length);
+            if (data.length > 0) {
+                console.log('Primer item completo:', data[0]);
+                console.log('Campos disponibles:', Object.keys(data[0]));
+            }
             
             let rendered = 0;
             data.forEach((item, index) => {
                 const geom = parseGeometry(item);
                 if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
 
-                const riesgo = item.riesgo || item.RIESGO || item.Riesgo || 'default';
+                // Probar múltiples variaciones del campo de riesgo
+                const riesgo = item.riesgo || item.RIESGO || item.Riesgo || 
+                              item.nivel || item.NIVEL || item.Nivel ||
+                              item.nivel_riesgo || item.NIVEL_RIESGO ||
+                              item.colapso || item.COLAPSO ||
+                              item.intensidad || item.INTENSIDAD || 'Sin información';
                 const color = COLORS.colapsoKarst[riesgo] || COLORS.colapsoKarst.default;
+
+                if (index === 0) {
+                    console.log('Campo de riesgo detectado:', riesgo);
+                }
 
                 const coords = parseGeoJSON(geom);
                 if (coords && coords.length > 0) {
@@ -4293,15 +4401,40 @@
 
                     const popupContent = `
                         <div class="custom-popup">
-                            <h3 style="color: ${color};">🏘️ Zona Comunal Ejidal</h3>
+                            <h3 style="color: ${color};">🏘️ Zona Comunal Ejidal (RAN)</h3>
                             <div class="custom-popup-divider" style="border-color: ${color};">
                                 <p><strong>Tipo:</strong> Tierra Comunal</p>
-                                ${item.ejido || item.EJIDO ? `<p><strong>Ejido:</strong> ${item.ejido || item.EJIDO}</p>` : ''}
+                                ${item.ejido || item.EJIDO || item.nombre || item.NOMBRE ? `<p><strong>Ejido:</strong> ${item.ejido || item.EJIDO || item.nombre || item.NOMBRE}</p>` : ''}
                                 ${item.nucleo || item.NUCLEO ? `<p><strong>Núcleo Agrario:</strong> ${item.nucleo || item.NUCLEO}</p>` : ''}
-                                ${item.superficie || item.SUPERFICIE ? `<p><strong>Superficie:</strong> ${(item.superficie || item.SUPERFICIE).toLocaleString()} ha</p>` : ''}
-                                <p style="margin-top: 10px; padding: 10px; background: #f3e8ff; border-left: 4px solid #a855f7; font-size: 12px;">
-                                    <strong>ℹ️ Información:</strong> Tierras de uso colectivo del ejido. Cualquier desarrollo requiere consulta y aprobación de la asamblea ejidal.
-                                </p>
+                                ${item.superficie || item.SUPERFICIE || item.sup_ha || item.SUP_HA ? `<p><strong>Superficie:</strong> ${(item.superficie || item.SUPERFICIE || item.sup_ha || item.SUP_HA).toLocaleString()} ha</p>` : ''}
+                                ${item.municipio || item.MUNICIPIO ? `<p><strong>Municipio:</strong> ${item.municipio || item.MUNICIPIO}</p>` : ''}
+                                
+                                <div style="margin-top: 15px; padding: 12px; background: #f3e8ff; border-left: 4px solid #a855f7; font-size: 12px;">
+                                    <strong style="color: #7c3aed;">📜 TIERRAS DE USO COLECTIVO DEL EJIDO</strong>
+                                    <p style="margin: 8px 0 0 0; line-height: 1.4;">
+                                        Son tierras de propiedad social destinadas al aprovechamiento común de los ejidatarios. 
+                                        <strong>Incluyen:</strong> bosques, pastizales, áreas de recolección, y zonas de preservación ecológica.
+                                    </p>
+                                </div>
+                                
+                                <div style="margin-top: 10px; padding: 12px; background: #fef3c7; border-left: 4px solid #f59e0b; font-size: 12px;">
+                                    <strong style="color: #d97706;">⚖️ DERECHOS Y PROTECCIONES LEGALES</strong>
+                                    <ul style="margin: 8px 0 0 0; padding-left: 20px; line-height: 1.4;">
+                                        <li>Propiedad colectiva inalienable de la comunidad ejidal</li>
+                                        <li>Cualquier desarrollo requiere consulta previa, libre e informada a la asamblea ejidal</li>
+                                        <li>Cambio de uso de suelo requiere aprobación de 2/3 de ejidatarios (Art. 23 Ley Agraria)</li>
+                                        <li>Protegidas por el Convenio 169 de la OIT sobre pueblos indígenas</li>
+                                        <li>Venta o privatización prohibida sin proceso legal específico</li>
+                                    </ul>
+                                </div>
+                                
+                                <div style="margin-top: 10px; padding: 12px; background: #fee2e2; border-left: 4px solid #dc2626; font-size: 12px;">
+                                    <strong style="color: #dc2626;">🚫 CONSTRUCCIÓN NO AUTORIZADA</strong>
+                                    <p style="margin: 8px 0 0 0; line-height: 1.4;">
+                                        Los fraccionamientos o desarrollos inmobiliarios sobre tierras comunales sin autorización ejidal constituyen <strong>despojo y son ilegales</strong>. 
+                                        El municipio NO puede autorizar construcciones sin consentimiento previo de la asamblea ejidal.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     `;
@@ -4346,15 +4479,40 @@
 
                     const popupContent = `
                         <div class="custom-popup">
-                            <h3 style="color: ${color};">🏘️ Zona Parcelada</h3>
+                            <h3 style="color: ${color};">🏘️ Zona Parcelada (RAN)</h3>
                             <div class="custom-popup-divider" style="border-color: ${color};">
                                 <p><strong>Tipo:</strong> Tierra Parcelada</p>
-                                ${item.ejido || item.EJIDO ? `<p><strong>Ejido:</strong> ${item.ejido || item.EJIDO}</p>` : ''}
+                                ${item.ejido || item.EJIDO || item.nombre || item.NOMBRE ? `<p><strong>Ejido:</strong> ${item.ejido || item.EJIDO || item.nombre || item.NOMBRE}</p>` : ''}
                                 ${item.nucleo || item.NUCLEO ? `<p><strong>Núcleo Agrario:</strong> ${item.nucleo || item.NUCLEO}</p>` : ''}
-                                ${item.superficie || item.SUPERFICIE ? `<p><strong>Superficie:</strong> ${(item.superficie || item.SUPERFICIE).toLocaleString()} ha</p>` : ''}
-                                <p style="margin-top: 10px; padding: 10px; background: #fed7aa; border-left: 4px solid #f97316; font-size: 12px;">
-                                    <strong>ℹ️ Información:</strong> Tierras parceladas del ejido para uso individual de ejidatarios. Cualquier cambio de uso de suelo requiere autorización ejidal y trámites legales.
-                                </p>
+                                ${item.superficie || item.SUPERFICIE || item.sup_ha || item.SUP_HA ? `<p><strong>Superficie:</strong> ${(item.superficie || item.SUPERFICIE || item.sup_ha || item.SUP_HA).toLocaleString()} ha</p>` : ''}
+                                ${item.municipio || item.MUNICIPIO ? `<p><strong>Municipio:</strong> ${item.municipio || item.MUNICIPIO}</p>` : ''}
+                                
+                                <div style="margin-top: 15px; padding: 12px; background: #fed7aa; border-left: 4px solid #f97316; font-size: 12px;">
+                                    <strong style="color: #ea580c;">🌾 TIERRAS PARCELADAS DEL EJIDO</strong>
+                                    <p style="margin: 8px 0 0 0; line-height: 1.4;">
+                                        Son tierras divididas en parcelas individuales para uso y usufructo de ejidatarios específicos. 
+                                        <strong>Uso típico:</strong> agricultura, ganadería, vivienda rural de ejidatarios.
+                                    </p>
+                                </div>
+                                
+                                <div style="margin-top: 10px; padding: 12px; background: #fef3c7; border-left: 4px solid #f59e0b; font-size: 12px;">
+                                    <strong style="color: #d97706;">⚖️ RÉGIMEN LEGAL ESPECIAL</strong>
+                                    <ul style="margin: 8px 0 0 0; padding-left: 20px; line-height: 1.4;">
+                                        <li>Derechos parcelarios pertenecen a ejidatarios registrados en el RAN</li>
+                                        <li>Transmisión requiere autorización de la asamblea ejidal</li>
+                                        <li>Cambio de uso de suelo agrícola a urbano necesita aprobación de asamblea</li>
+                                        <li>Compraventa a no-ejidatarios requiere dominio pleno (PROCEDE)</li>
+                                        <li>Sin dominio pleno, la tierra NO puede venderse a terceros</li>
+                                    </ul>
+                                </div>
+                                
+                                <div style="margin-top: 10px; padding: 12px; background: #fee2e2; border-left: 4px solid #dc2626; font-size: 12px;">
+                                    <strong style="color: #dc2626;">⚠️ ADVERTENCIA PARA DESARROLLADORES</strong>
+                                    <p style="margin: 8px 0 0 0; line-height: 1.4;">
+                                        La compra de tierras parceladas sin verificar el estatus legal en el RAN puede resultar en <strong>nulidad de contratos</strong>. 
+                                        Desarrollos inmobiliarios requieren que TODAS las parcelas involucradas tengan dominio pleno certificado.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     `;
@@ -4374,6 +4532,255 @@
             });
             
             console.log(`✓ ${rendered} zonas parceladas renderizadas`);
+        }
+
+        function renderNucleosAgrarios(data) {
+            console.log('=== RENDERIZANDO NÚCLEOS AGRARIOS (RAN) ===');
+            console.log('Total items:', data.length);
+            
+            let rendered = 0;
+            data.forEach((item, index) => {
+                const geom = parseGeometry(item);
+                if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+
+                const color = COLORS.tierrasEjidales.nucleos;
+
+                const coords = parseGeoJSON(geom);
+                if (coords && coords.length > 0) {
+                    const polygon = L.polygon(coords, {
+                        color: color,
+                        fillColor: color,
+                        fillOpacity: 0.3,
+                        weight: 2,
+                        opacity: 0.7
+                    });
+
+                    const popupContent = `
+                        <div class="custom-popup">
+                            <h3 style="color: ${color};">🏛️ Núcleo Agrario (RAN)</h3>
+                            <div class="custom-popup-divider" style="border-color: ${color};">
+                                <p><strong>Tipo:</strong> Núcleo Agrario Certificado</p>
+                                ${item.nombre || item.NOMBRE || item.nucleo || item.NUCLEO ? `<p><strong>Nombre:</strong> ${item.nombre || item.NOMBRE || item.nucleo || item.NUCLEO}</p>` : ''}
+                                ${item.tipo || item.TIPO ? `<p><strong>Tipo de Núcleo:</strong> ${item.tipo || item.TIPO}</p>` : ''}
+                                ${item.superficie || item.SUPERFICIE || item.sup_ha || item.SUP_HA ? `<p><strong>Superficie Total:</strong> ${(item.superficie || item.SUPERFICIE || item.sup_ha || item.SUP_HA).toLocaleString()} ha</p>` : ''}
+                                ${item.municipio || item.MUNICIPIO ? `<p><strong>Municipio:</strong> ${item.municipio || item.MUNICIPIO}</p>` : ''}
+                                ${item.num_certif || item.NUM_CERTIF ? `<p><strong>Número de Certificación:</strong> ${item.num_certif || item.NUM_CERTIF}</p>` : ''}
+                                
+                                <div style="margin-top: 15px; padding: 12px; background: #fef9e7; border-left: 4px solid #92400e; font-size: 12px;">
+                                    <strong style="color: #78350f;">📋 NÚCLEO AGRARIO CERTIFICADO POR RAN</strong>
+                                    <p style="margin: 8px 0 0 0; line-height: 1.4;">
+                                        Unidad básica de organización agraria que agrupa ejidos o comunidades. Incluye todas las tierras (comunales, parceladas y asentamiento humano) bajo la jurisdicción de una asamblea.
+                                    </p>
+                                </div>
+                                
+                                <div style="margin-top: 10px; padding: 12px; background: #e0f2fe; border-left: 4px solid #0284c7; font-size: 12px;">
+                                    <strong style="color: #0369a1;">🔐 CERTIFICACIÓN Y REGISTRO</strong>
+                                    <ul style="margin: 8px 0 0 0; padding-left: 20px; line-height: 1.4;">
+                                        <li>Certificado por el Registro Agrario Nacional (RAN)</li>
+                                        <li>Incluye plano definitivo y límites certificados</li>
+                                        <li>Registro de derechos de ejidatarios y comuneros</li>
+                                        <li>Base legal para resolución de conflictos territoriales</li>
+                                    </ul>
+                                </div>
+                                
+                                <div style="margin-top: 10px; padding: 12px; background: #fef3c7; border-left: 4px solid #f59e0b; font-size: 12px;">
+                                    <strong style="color: #d97706;">⚖️ AUTORIDAD MÁXIMA: ASAMBLEA</strong>
+                                    <p style="margin: 8px 0 0 0; line-height: 1.4;">
+                                        La asamblea general de ejidatarios o comuneros es el órgano supremo del núcleo agrario. Toda decisión sobre uso de suelo debe pasar por asamblea con quórum legal.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    polygon.bindPopup(popupContent);
+                    
+                    polygon.on('mouseover', function() {
+                        this.setStyle({ fillOpacity: 0.5, weight: 3 });
+                    });
+                    polygon.on('mouseout', function() {
+                        this.setStyle({ fillOpacity: 0.3, weight: 2 });
+                    });
+
+                    polygon.addTo(layerGroups.nucleosAgrarios);
+                    rendered++;
+                }
+            });
+            
+            console.log(`✓ ${rendered} núcleos agrarios renderizados`);
+        }
+
+        function renderAsentamientosHumanos(data) {
+            console.log('=== RENDERIZANDO ASENTAMIENTOS HUMANOS (RAN) ===');
+            console.log('Total items:', data.length);
+            
+            let rendered = 0;
+            data.forEach((item, index) => {
+                const geom = parseGeometry(item);
+                if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+
+                const color = COLORS.tierrasEjidales.asentamientos;
+
+                const coords = parseGeoJSON(geom);
+                if (coords && coords.length > 0) {
+                    const polygon = L.polygon(coords, {
+                        color: color,
+                        fillColor: color,
+                        fillOpacity: 0.4,
+                        weight: 2,
+                        opacity: 0.8
+                    });
+
+                    const popupContent = `
+                        <div class="custom-popup">
+                            <h3 style="color: ${color};">🏘️ Zona de Asentamiento Humano (RAN)</h3>
+                            <div class="custom-popup-divider" style="border-color: ${color};">
+                                <p><strong>Tipo:</strong> Asentamiento Humano Ejidal</p>
+                                ${item.ejido || item.EJIDO || item.nombre || item.NOMBRE ? `<p><strong>Ejido:</strong> ${item.ejido || item.EJIDO || item.nombre || item.NOMBRE}</p>` : ''}
+                                ${item.nucleo || item.NUCLEO ? `<p><strong>Núcleo Agrario:</strong> ${item.nucleo || item.NUCLEO}</p>` : ''}
+                                ${item.superficie || item.SUPERFICIE || item.sup_ha || item.SUP_HA ? `<p><strong>Superficie:</strong> ${(item.superficie || item.SUPERFICIE || item.sup_ha || item.SUP_HA).toLocaleString()} ha</p>` : ''}
+                                ${item.municipio || item.MUNICIPIO ? `<p><strong>Municipio:</strong> ${item.municipio || item.MUNICIPIO}</p>` : ''}
+                                
+                                <div style="margin-top: 15px; padding: 12px; background: #f1f5f9; border-left: 4px solid #64748b; font-size: 12px;">
+                                    <strong style="color: #475569;">🏠 ZONA DE ASENTAMIENTO HUMANO</strong>
+                                    <p style="margin: 8px 0 0 0; line-height: 1.4;">
+                                        Área destinada para la vivienda de ejidatarios y sus familias dentro del ejido. Conocida como "el pueblo" o "la cabecera ejidal". 
+                                        Incluye solares urbanos, infraestructura comunitaria, escuelas, clínicas y espacios públicos.
+                                    </p>
+                                </div>
+                                
+                                <div style="margin-top: 10px; padding: 12px; background: #fef3c7; border-left: 4px solid #f59e0b; font-size: 12px;">
+                                    <strong style="color: #d97706;">⚖️ RÉGIMEN JURÍDICO ESPECIAL</strong>
+                                    <ul style="margin: 8px 0 0 0; padding-left: 20px; line-height: 1.4;">
+                                        <li>Propiedad social inalienable destinada a vivienda ejidal</li>
+                                        <li>Solares asignados a ejidatarios por la asamblea</li>
+                                        <li>Expansión urbana requiere aprobación de asamblea ejidal</li>
+                                        <li>Servicios públicos son responsabilidad compartida (ejido-municipio)</li>
+                                        <li>Regularización y títulos individuales posibles mediante PROCEDE</li>
+                                    </ul>
+                                </div>
+                                
+                                <div style="margin-top: 10px; padding: 12px; background: #fee2e2; border-left: 4px solid #dc2626; font-size: 12px;">
+                                    <strong style="color: #dc2626;">⚠️ CONFLICTOS URBANO-AGRARIOS</strong>
+                                    <p style="margin: 8px 0 0 0; line-height: 1.4;">
+                                        El crecimiento urbano de Puerto Morelos frecuentemente presiona estas zonas. 
+                                        <strong>Cualquier proyecto del municipio requiere negociación con la asamblea ejidal.</strong> 
+                                        Despojos o invasiones son denunciables ante la Procuraduría Agraria.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    polygon.bindPopup(popupContent);
+                    
+                    polygon.on('mouseover', function() {
+                        this.setStyle({ fillOpacity: 0.6, weight: 3 });
+                    });
+                    polygon.on('mouseout', function() {
+                        this.setStyle({ fillOpacity: 0.4, weight: 2 });
+                    });
+
+                    polygon.addTo(layerGroups.asentamientosHumanos);
+                    rendered++;
+                }
+            });
+            
+            console.log(`✓ ${rendered} asentamientos humanos renderizados`);
+        }
+
+        function renderFraccionamientos(data) {
+            console.log('=== RENDERIZANDO FRACCIONAMIENTOS A LEGALIZAR (POEL 2024) ===');
+            console.log('Total items:', data.length);
+            
+            let rendered = 0;
+            data.forEach((item, index) => {
+                const geom = parseGeometry(item);
+                if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+
+                const color = COLORS.fraccionamientos;
+
+                const coords = parseGeoJSON(geom);
+                if (coords && coords.length > 0) {
+                    const polygon = L.polygon(coords, {
+                        color: color,
+                        fillColor: color,
+                        fillOpacity: 0.6,
+                        weight: 3,
+                        opacity: 0.9
+                    });
+
+                    const popupContent = `
+                        <div class="custom-popup">
+                            <h3 style="color: ${color};">🚨 Fraccionamiento a Legalizar (POEL 2024)</h3>
+                            <div class="custom-popup-divider" style="border-color: ${color};">
+                                ${item.nombre || item.NOMBRE ? `<p><strong>Nombre:</strong> ${item.nombre || item.NOMBRE}</p>` : ''}
+                                ${item.tipo || item.TIPO ? `<p><strong>Tipo:</strong> ${item.tipo || item.TIPO}</p>` : ''}
+                                ${item.superficie || item.SUPERFICIE || item.area || item.AREA ? `<p><strong>Superficie:</strong> ${(item.superficie || item.SUPERFICIE || item.area || item.AREA).toLocaleString()} ha</p>` : ''}
+                                ${item.desarrollador || item.DESARROLLADOR ? `<p><strong>Desarrollador:</strong> ${item.desarrollador || item.DESARROLLADOR}</p>` : ''}
+                                ${item.status || item.STATUS ? `<p><strong>Estatus:</strong> ${item.status || item.STATUS}</p>` : ''}
+                                
+                                <div style="margin-top: 15px; padding: 15px; background: #fee2e2; border-left: 4px solid #dc2626; font-size: 12px;">
+                                    <strong style="color: #dc2626; font-size: 14px;">🚨 PROYECTO DE LEGALIZACIÓN MUNICIPAL</strong>
+                                    <p style="margin: 8px 0 0 0; line-height: 1.5;">
+                                        Este fraccionamiento forma parte de los <strong>desarrollos que el municipio pretende legalizar</strong> 
+                                        mediante la actualización del POEL (Programa de Ordenamiento Ecológico Local) y el PDU (Plan de Desarrollo Urbano) iniciados en 2024.
+                                    </p>
+                                </div>
+                                
+                                <div style="margin-top: 12px; padding: 15px; background: #fef3c7; border-left: 4px solid #f59e0b; font-size: 12px;">
+                                    <strong style="color: #ea580c; font-size: 13px;">⚠️ PREOCUPACIONES COMUNITARIAS</strong>
+                                    <ul style="margin: 8px 0 0 0; padding-left: 20px; line-height: 1.5;">
+                                        <li><strong>Seguridad hídrica:</strong> Mayor presión sobre acuíferos kársticos ya vulnerables</li>
+                                        <li><strong>Zonas de riesgo:</strong> Posible construcción sobre áreas de colapso por karstificación</li>
+                                        <li><strong>Derechos territoriales:</strong> Posible conflicto con tierras ejidales/comunales</li>
+                                        <li><strong>Impacto ambiental:</strong> Fragmentación de ecosistemas y zonas inundables</li>
+                                        <li><strong>Servicios públicos:</strong> Capacidad insuficiente de infraestructura municipal</li>
+                                    </ul>
+                                </div>
+                                
+                                <div style="margin-top: 12px; padding: 15px; background: #e0f2fe; border-left: 4px solid #0284c7; font-size: 12px;">
+                                    <strong style="color: #0369a1; font-size: 13px;">📢 PARTICIPA EN LA CONSULTA PÚBLICA</strong>
+                                    <p style="margin: 8px 0 0 0; line-height: 1.5;">
+                                        Como vecina o vecino de Puerto Morelos, tienes derecho a:
+                                    </p>
+                                    <ul style="margin: 8px 0 0 0; padding-left: 20px; line-height: 1.5;">
+                                        <li>Conocer los estudios técnicos de impacto ambiental y urbano</li>
+                                        <li>Participar en audiencias públicas sobre el POEL y PDU</li>
+                                        <li>Presentar observaciones y oposiciones documentadas</li>
+                                        <li>Exigir transparencia en las autorizaciones otorgadas</li>
+                                        <li>Solicitar amparos si hay violaciones a derechos ambientales</li>
+                                    </ul>
+                                </div>
+                                
+                                <div style="margin-top: 12px; padding: 12px; background: #dcfce7; border-left: 4px solid #16a34a; font-size: 11px;">
+                                    <strong style="color: #15803d;">💡 FUENTES DE INFORMACIÓN:</strong>
+                                    <p style="margin: 5px 0 0 0; line-height: 1.4;">
+                                        • Gaceta Municipal de Puerto Morelos<br>
+                                        • Dirección de Ecología y Medio Ambiente Municipal<br>
+                                        • Instituto de Planeación de Desarrollo Urbano de BJ<br>
+                                        • Procuraduría de Protección al Ambiente de QR
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    polygon.bindPopup(popupContent);
+                    
+                    polygon.on('mouseover', function() {
+                        this.setStyle({ fillOpacity: 0.8, weight: 4 });
+                    });
+                    polygon.on('mouseout', function() {
+                        this.setStyle({ fillOpacity: 0.6, weight: 3 });
+                    });
+
+                    polygon.addTo(layerGroups.fraccionamientos);
+                    rendered++;
+                }
+            });
+            
+            console.log(`✓ ${rendered} fraccionamientos a legalizar renderizados`);
         }
 
         // Controles de capas
@@ -4495,6 +4902,21 @@
         document.getElementById('layer-tierras-parceladas').addEventListener('change', (e) => {
             if (e.target.checked) map.addLayer(layerGroups.tierrasParceladas);
             else map.removeLayer(layerGroups.tierrasParceladas);
+        });
+
+        document.getElementById('layer-nucleos-agrarios').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.nucleosAgrarios);
+            else map.removeLayer(layerGroups.nucleosAgrarios);
+        });
+
+        document.getElementById('layer-asentamientos-humanos').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.asentamientosHumanos);
+            else map.removeLayer(layerGroups.asentamientosHumanos);
+        });
+
+        document.getElementById('layer-fraccionamientos').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.fraccionamientos);
+            else map.removeLayer(layerGroups.fraccionamientos);
         });
 
         // Función para minimizar/maximizar paneles
