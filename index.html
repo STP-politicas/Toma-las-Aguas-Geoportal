@@ -3585,6 +3585,164 @@ idxdentro:[{rio.lat}, ${rio.lng}]`);
             }
         });
     }
+    function renderNucleosAgrarios(data) {
+    data.forEach(item => {
+        const geom = parseGeometry(item);
+        if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+
+        const coords = parseGeoJSON(geom);
+        if (coords && coords.length > 0) {
+            const polygon = L.polygon(coords, {
+                color: '#6366f1',
+                fillColor: '#6366f1',
+                fillOpacity: 0.35,
+                weight: 2,
+                opacity: 0.8
+            });
+
+            const popupContent = `
+                <div class="custom-popup">
+                    <h3 style="color: #6366f1;">🏘️ Núcleo Agrario (RAN)</h3>
+                    <div class="custom-popup-divider" style="border-color: #6366f1;">
+                        <p><strong>Nombre:</strong> ${item.NombreNucleoAgrario || 'N/A'}</p>
+                        <p><strong>Tipo:</strong> ${item.TipoNucleoAgrario || 'N/A'}</p>
+                        <p><strong>Municipio:</strong> ${item.NombreMunicipio || 'Puerto Morelos'}</p>
+                        ${item.Area ? `<p><strong>Área:</strong> ${parseFloat(item.Area).toLocaleString('es-MX')} ha</p>` : ''}
+                        
+                        <div style="margin-top: 10px; padding: 10px; background: #e0e7ff; border-left: 4px solid #6366f1;">
+                            <strong>Marco Legal (Ley Agraria):</strong>
+                            <p style="font-size: 12px; margin: 5px 0;">
+                                <strong>Art. 23:</strong> Las tierras ejidales comprenden parceladas, de uso común y del asentamiento humano.<br>
+                                <strong>Art. 56:</strong> Cambios de uso requieren 2/3 de votos en asamblea.<br>
+                                <strong>Art. 87:</strong> Modificaciones requieren autorización del RAN.<br>
+                                <strong>Requisito ambiental:</strong> MIA ante SEMARNAT.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            polygon.bindPopup(popupContent, { maxWidth: 450 });
+            polygon.on('mouseover', function() { this.setStyle({ fillOpacity: 0.55, weight: 3 }); });
+            polygon.on('mouseout', function() { this.setStyle({ fillOpacity: 0.35, weight: 2 }); });
+            polygon.addTo(layerGroups.nucleosAgrarios);
+        }
+    });
+}
+
+function renderAsentamientosHumanos(data) {
+    data.forEach(item => {
+        const geom = parseGeometry(item);
+        if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+
+        const coords = parseGeoJSON(geom);
+        if (coords && coords.length > 0) {
+            const polygon = L.polygon(coords, {
+                color: '#ec4899',
+                fillColor: '#ec4899',
+                fillOpacity: 0.40,
+                weight: 2,
+                opacity: 0.8
+            });
+
+            const popupContent = `
+                <div class="custom-popup">
+                    <h3 style="color: #ec4899;">🏘️ Asentamiento Humano (RAN)</h3>
+                    <div class="custom-popup-divider" style="border-color: #ec4899;">
+                        <p><strong>Localidad:</strong> ${item.NombreLocalidad || 'N/A'}</p>
+                        <p><strong>Núcleo Agrario:</strong> ${item.NombreNucleoAgrario || 'N/A'}</p>
+                        ${item.Area ? `<p><strong>Área:</strong> ${parseFloat(item.Area).toLocaleString('es-MX')} ha</p>` : ''}
+                        
+                        <div style="margin-top: 10px; padding: 10px; background: #fce7f3; border-left: 4px solid #ec4899;">
+                            <strong>Marco Legal (Ley Agraria Art. 63-72):</strong>
+                            <p style="font-size: 12px; margin: 5px 0;">
+                                Área necesaria para desarrollo de vida comunitaria.<br>
+                                <strong>Art. 64:</strong> Solares inalienables, no transferibles a ajenos al ejido.<br>
+                                <strong>Restricciones:</strong> Uso exclusivamente habitacional.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            polygon.bindPopup(popupContent, { maxWidth: 450 });
+            polygon.on('mouseover', function() { this.setStyle({ fillOpacity: 0.60, weight: 3 }); });
+            polygon.on('mouseout', function() { this.setStyle({ fillOpacity: 0.40, weight: 2 }); });
+            polygon.addTo(layerGroups.asentamientosHumanos);
+        }
+    });
+}
+
+function renderFraccionamientosPOEL(data) {
+    data.forEach(item => {
+        const geom = parseGeometry(item);
+        if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+
+        const coords = parseGeoJSON(geom);
+        if (coords && coords.length > 0) {
+            const polygon = L.polygon(coords, {
+                color: '#ef4444',
+                fillColor: '#ef4444',
+                fillOpacity: 0.50,
+                weight: 3,
+                opacity: 0.9,
+                dashArray: '10, 5'
+            });
+
+            const popupContent = `
+                <div class="custom-popup">
+                    <div style="background: #fee2e2; padding: 12px; border-radius: 6px; margin-bottom: 12px; border: 2px solid #ef4444;">
+                        <h3 style="color: #991b1b; margin: 0 0 8px 0; display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 24px;">🚨</span>
+                            ALERTA CIUDADANA
+                        </h3>
+                        <p style="font-size: 13px; font-weight: 600; margin: 0; color: #7f1d1d;">
+                            Fraccionamiento Irregular que el Municipio busca legalizar mediante POEL/PDU 2024
+                        </p>
+                    </div>
+                    
+                    <div class="custom-popup-divider" style="border-color: #ef4444;">
+                        ${item.Nombre ? `<p><strong>Nombre:</strong> ${item.Nombre}</p>` : ''}
+                        ${item.Area ? `<p><strong>Área:</strong> ${parseFloat(item.Area).toLocaleString('es-MX')} ha</p>` : ''}
+                        
+                        <div style="margin-top: 12px; padding: 12px; background: #fef3c7; border-left: 4px solid #f59e0b;">
+                            <strong>⚠️ Situación:</strong>
+                            <p style="font-size: 12px; margin: 5px 0 0 0;">
+                                Construido sin permisos. El municipio busca legalizarlo mediante POEL/PDU 2024.
+                            </p>
+                        </div>
+                        
+                        <div style="margin-top: 12px; padding: 12px; background: #fee2e2; border-left: 4px solid #ef4444;">
+                            <strong>🌊 Implicaciones para Seguridad Hídrica:</strong>
+                            <ul style="font-size: 12px; margin: 5px 0; padding-left: 20px;">
+                                <li>Precedente peligroso: incentiva construcciones ilegales</li>
+                                <li>Zona de recarga del acuífero: Fractura Holbox-Xel-Há</li>
+                                <li>Sin MIA: sin evaluación de impacto ambiental</li>
+                                <li>Impermeabilización reduce infiltración natural</li>
+                                <li>Pozos sin control sobreexplotan el acuífero</li>
+                            </ul>
+                        </div>
+                        
+                        <div style="margin-top: 12px; padding: 12px; background: #dbeafe; border-left: 4px solid #3b82f6;">
+                            <strong>👥 ¿Qué puedes hacer?</strong>
+                            <ul style="font-size: 12px; margin: 5px 0; padding-left: 20px;">
+                                <li>Participar en consultas públicas del POEL/PDU 2024</li>
+                                <li>Exigir MIA retroactiva</li>
+                                <li>Demandar transparencia</li>
+                                <li>Reportar a PROFEPA y CONAGUA</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            polygon.bindPopup(popupContent, { maxWidth: 500 });
+            polygon.on('mouseover', function() { this.setStyle({ fillOpacity: 0.70, weight: 4 }); });
+            polygon.on('mouseout', function() { this.setStyle({ fillOpacity: 0.50, weight: 3 }); });
+            polygon.addTo(layerGroups.fraccionamientosPOEL);
+        }
+    });
+}
 
     // ========== NUEVAS FUNCIONES DE RENDERIZADO RAN ==========
 
