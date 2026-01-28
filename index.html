@@ -3107,6 +3107,68 @@
                     }
                 }
             } catch (e) { console.error('Error tierras parceladas:', e); }
+            // NÚCLEOS AGRARIOS (RAN) - NUEVO
+            try {
+                updateLoading('Cargando núcleos agrarios (RAN)...');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('nucleos agrarios (ran) — zo_nucleosagrarios_ran_copy')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        updateLayerCount('nucleos-agrarios', data.length);
+                        renderNucleosAgrarios(data);
+                        console.log(`✓ ${data.length} núcleos agrarios cargados`);
+                    }
+                }
+            } catch (e) { console.error('Error núcleos agrarios:', e); }
+
+            // ASENTAMIENTOS HUMANOS (RAN) - NUEVO
+            try {
+                updateLoading('Cargando asentamientos humanos (RAN)...');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('zona asentamientos humanos (RAN) — zo_asentamientoshumanos_ra')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        updateLayerCount('asentamientos-humanos', data.length);
+                        renderAsentamientosHumanos(data);
+                        console.log(`✓ ${data.length} asentamientos humanos cargados`);
+                    }
+                }
+            } catch (e) { console.error('Error asentamientos humanos:', e); }
+
+            // FRACCIONAMIENTOS POEL NUEVO - NUEVO
+            try {
+                updateLoading('Cargando fraccionamientos que buscan legalizar...');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('fraccionamiento que busca legalizar el poel nuevo — fracc_poe')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        updateLayerCount('fraccionamientos-poel', data.length);
+                        renderFraccionamientosPOEL(data);
+                        console.log(`✓ ${data.length} fraccionamientos POEL cargados`);
+                    }
+                }
+            } catch (e) { console.error('Error fraccionamientos POEL:', e); }
         }
 
         function renderCuerposAgua(data) {
