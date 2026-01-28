@@ -4294,8 +4294,8 @@
                 const geom = parseGeometry(item);
                 if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
 
-                const riesgo = item.riesgo || item.RIESGO || item.Riesgo || 'default';
-                const color = COLORS.colapsoKarst[riesgo] || COLORS.colapsoKarst.default;
+                const rango = item.rango || item.RANGO || item.RANGO || 'default';
+                const color = COLORS.colapsoKarst[rango] || COLORS.colapsoKarst.default;
 
                 const coords = parseGeoJSON(geom);
                 if (coords && coords.length > 0) {
