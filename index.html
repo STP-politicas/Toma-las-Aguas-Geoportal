@@ -889,6 +889,27 @@
                 max-width: 350px;
             }
         }
+
+        /* Animación para marcador GPS */
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 4px 12px rgba(16, 185, 129, 0.5);
+                transform: scale(1);
+            }
+            50% {
+                box-shadow: 0 4px 20px rgba(16, 185, 129, 0.8);
+                transform: scale(1.05);
+            }
+            100% {
+                box-shadow: 0 4px 12px rgba(16, 185, 129, 0.5);
+                transform: scale(1);
+            }
+        }
+
+        .gps-marker {
+            background: transparent !important;
+            border: none !important;
+        }
     </style>
 </head>
 <body>
@@ -6026,10 +6047,59 @@
                     </div>
                 </div>
                 
-                <button type="button" id="enable-hidrosocial-map-click" 
-                    style="width: 100%; padding: 10px; background: #f59e0b; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);">
-                    📍 Capturar Coordenadas del Mapa
-                </button>
+                <!-- INFO BOX -->
+                <div style="background: rgba(255,255,255,0.7); padding: 10px; border-radius: 6px; margin-bottom: 10px; border: 1px solid #f59e0b;">
+                    <p style="margin: 0; font-size: 11px; color: #78350f; line-height: 1.4;">
+                        <strong>💡 Dos formas de capturar ubicación:</strong><br>
+                        <strong>1) GPS:</strong> Usa tu ubicación actual (ideal si estás en el sitio del proyecto)<br>
+                        <strong>2) Mapa:</strong> Haz click en el mapa para elegir cualquier ubicación
+                    </p>
+                </div>
+                
+                <!-- BOTONES DE CAPTURA -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <!-- BOTÓN GPS -->
+                    <button type="button" id="gps-location-btn" onclick="captureUserLocation()"
+                        style="
+                            width: 100%; 
+                            padding: 12px; 
+                            background: linear-gradient(135deg, #10b981, #059669); 
+                            color: white; 
+                            border: none; 
+                            border-radius: 6px; 
+                            cursor: pointer; 
+                            font-size: 13px; 
+                            font-weight: 600; 
+                            box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+                            transition: all 0.2s;
+                        "
+                        onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(16, 185, 129, 0.4)';"
+                        onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 6px rgba(16, 185, 129, 0.3)';"
+                    >
+                        📡 Mi Ubicación GPS
+                    </button>
+                    
+                    <!-- BOTÓN MAPA -->
+                    <button type="button" id="enable-hidrosocial-map-click" 
+                        style="
+                            width: 100%; 
+                            padding: 12px; 
+                            background: linear-gradient(135deg, #f59e0b, #d97706); 
+                            color: white; 
+                            border: none; 
+                            border-radius: 6px; 
+                            cursor: pointer; 
+                            font-size: 13px; 
+                            font-weight: 600; 
+                            box-shadow: 0 2px 6px rgba(245, 158, 11, 0.3);
+                            transition: all 0.2s;
+                        "
+                        onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(245, 158, 11, 0.4)';"
+                        onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 6px rgba(245, 158, 11, 0.3)';"
+                    >
+                        🗺️ Capturar del Mapa
+                    </button>
+                </div>
             </div>
             
             <!-- Información adicional -->
@@ -6340,6 +6410,7 @@
 // Variable global para tracking de modo click
 let mapClickEnabledHidrosocial = false;
 let tempMarkerHidrosocial = null;
+let gpsMarker = null; // Marcador temporal para ubicación GPS del usuario
 
 // Abrir modal de agregar
 document.getElementById('add-hidrosocial-btn')?.addEventListener('click', () => {
@@ -6352,6 +6423,13 @@ document.getElementById('close-add-hidrosocial-modal')?.addEventListener('click'
     document.getElementById('add-hidrosocial-form').reset();
     document.getElementById('add-hidrosocial-error').style.display = 'none';
     document.getElementById('add-hidrosocial-success').style.display = 'none';
+    cleanupGPSMarker(); // Limpiar marcador GPS
+    
+    // Limpiar marcador temporal de click en mapa
+    if (tempMarkerHidrosocial) {
+        map.removeLayer(tempMarkerHidrosocial);
+        tempMarkerHidrosocial = null;
+    }
 });
 
 // Cerrar modal de editar
@@ -6360,6 +6438,7 @@ document.getElementById('close-edit-hidrosocial-modal')?.addEventListener('click
     document.getElementById('edit-hidrosocial-form').reset();
     document.getElementById('edit-hidrosocial-error').style.display = 'none';
     document.getElementById('edit-hidrosocial-success').style.display = 'none';
+    cleanupGPSMarker(); // Limpiar marcador GPS
 });
 
 // Activar captura de coordenadas en mapa
@@ -6599,6 +6678,196 @@ function moveProyectoHidrosocial(projectId, currentLat, currentLng) {
     
     map.on('click', moveClickHandler);
     map.getContainer().style.cursor = 'crosshair';
+}
+
+// ============================================================
+// FUNCIÓN PARA CAPTURAR UBICACIÓN GPS DEL USUARIO
+// ============================================================
+
+/**
+ * Captura la ubicación GPS del usuario usando la API de Geolocalización
+ * Útil para móviles cuando el usuario está en el sitio del proyecto
+ */
+async function captureUserLocation() {
+    // Verificar que el navegador soporte geolocalización
+    if (!navigator.geolocation) {
+        alert('❌ Tu navegador no soporta geolocalización.\n\nPor favor usa el botón "🗺️ Capturar del Mapa" en su lugar.');
+        return;
+    }
+    
+    // Mostrar indicador de carga
+    const button = document.getElementById('gps-location-btn');
+    const originalText = button.innerHTML;
+    button.innerHTML = '📡 Obteniendo ubicación GPS...';
+    button.disabled = true;
+    button.style.opacity = '0.6';
+    
+    // Opciones para la geolocalización
+    const options = {
+        enableHighAccuracy: true,  // Usar GPS de alta precisión
+        timeout: 10000,            // Timeout de 10 segundos
+        maximumAge: 0              // No usar caché, obtener ubicación fresca
+    };
+    
+    try {
+        // Obtener posición GPS
+        const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, options);
+        });
+        
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        const accuracy = position.coords.accuracy; // Precisión en metros
+        
+        // Actualizar campos del formulario
+        document.getElementById('hidrosocial-lat').value = lat.toFixed(6);
+        document.getElementById('hidrosocial-lng').value = lng.toFixed(6);
+        
+        // Remover marcador GPS anterior si existe
+        if (gpsMarker) {
+            map.removeLayer(gpsMarker);
+            if (gpsMarker.accuracyCircle) {
+                map.removeLayer(gpsMarker.accuracyCircle);
+            }
+        }
+        
+        // Crear marcador GPS en el mapa
+        gpsMarker = L.marker([lat, lng], {
+            icon: L.divIcon({
+                className: 'gps-marker',
+                html: `
+                    <div style="position: relative;">
+                        <div style="
+                            background: linear-gradient(135deg, #10b981, #059669);
+                            width: 40px;
+                            height: 40px;
+                            border-radius: 50%;
+                            border: 4px solid white;
+                            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.5);
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 20px;
+                            animation: pulse 2s infinite;
+                        ">
+                            📍
+                        </div>
+                        <div style="
+                            position: absolute;
+                            top: -30px;
+                            left: 50%;
+                            transform: translateX(-50%);
+                            background: #10b981;
+                            color: white;
+                            padding: 4px 8px;
+                            border-radius: 4px;
+                            white-space: nowrap;
+                            font-size: 11px;
+                            font-weight: 600;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                        ">
+                            Mi ubicación GPS
+                        </div>
+                    </div>
+                `,
+                iconSize: [40, 40],
+                iconAnchor: [20, 20]
+            })
+        }).addTo(map);
+        
+        // Agregar círculo de precisión
+        const accuracyCircle = L.circle([lat, lng], {
+            radius: accuracy,
+            color: '#10b981',
+            fillColor: '#10b981',
+            fillOpacity: 0.1,
+            weight: 2,
+            dashArray: '5, 5'
+        }).addTo(map);
+        
+        // Asociar círculo al marcador para eliminarlo después
+        gpsMarker.accuracyCircle = accuracyCircle;
+        
+        // Centrar el mapa en la ubicación GPS
+        map.setView([lat, lng], 17); // Zoom 17 para ver detalles
+        
+        // Restaurar botón
+        button.innerHTML = originalText;
+        button.disabled = false;
+        button.style.opacity = '1';
+        
+        // Mensaje de éxito
+        const accuracyText = accuracy < 10 ? 
+            'excelente precisión' : 
+            accuracy < 50 ? 
+            'buena precisión' : 
+            'precisión moderada';
+        
+        alert(
+            `✅ Ubicación GPS capturada exitosamente!\n\n` +
+            `📍 Latitud: ${lat.toFixed(6)}\n` +
+            `📍 Longitud: ${lng.toFixed(6)}\n` +
+            `🎯 Precisión: ±${Math.round(accuracy)} metros (${accuracyText})\n\n` +
+            `Los campos del formulario han sido actualizados.`
+        );
+        
+    } catch (error) {
+        // Manejar errores
+        let errorMessage = '❌ No se pudo obtener tu ubicación GPS.\n\n';
+        
+        if (error.code === 1) {
+            // PERMISSION_DENIED
+            errorMessage += 
+                '🔒 Permisos de ubicación denegados.\n\n' +
+                'Para usar esta función:\n' +
+                '1. Ve a la configuración de tu navegador\n' +
+                '2. Permite el acceso a ubicación para este sitio\n' +
+                '3. Intenta de nuevo\n\n' +
+                'O usa el botón "🗺️ Capturar del Mapa" en su lugar.';
+        } else if (error.code === 2) {
+            // POSITION_UNAVAILABLE
+            errorMessage += 
+                '📡 Ubicación no disponible.\n\n' +
+                'Posibles causas:\n' +
+                '- GPS desactivado en tu dispositivo\n' +
+                '- Mala señal GPS (intenta al aire libre)\n' +
+                '- Problemas de conectividad\n\n' +
+                'Usa el botón "🗺️ Capturar del Mapa" en su lugar.';
+        } else if (error.code === 3) {
+            // TIMEOUT
+            errorMessage += 
+                '⏱️ Tiempo de espera agotado.\n\n' +
+                'El GPS está tardando demasiado.\n' +
+                'Intenta:\n' +
+                '- Moverte al aire libre\n' +
+                '- Esperar un momento y reintentar\n' +
+                '- Usar el botón "🗺️ Capturar del Mapa"';
+        } else {
+            errorMessage += 
+                `Error: ${error.message}\n\n` +
+                'Usa el botón "🗺️ Capturar del Mapa" en su lugar.';
+        }
+        
+        alert(errorMessage);
+        
+        // Restaurar botón
+        button.innerHTML = originalText;
+        button.disabled = false;
+        button.style.opacity = '1';
+        
+        console.error('Error de geolocalización:', error);
+    }
+}
+
+// Limpiar marcadores GPS cuando se cierra el modal
+function cleanupGPSMarker() {
+    if (gpsMarker) {
+        map.removeLayer(gpsMarker);
+        if (gpsMarker.accuracyCircle) {
+            map.removeLayer(gpsMarker.accuracyCircle);
+        }
+        gpsMarker = null;
+    }
 }
 </script>
 </body>
