@@ -71,7 +71,7 @@
             position: absolute;
             top: 10px;
             right: 10px;
-            background: #3b82f6;
+            background: #ef4444;
             color: white;
             border: none;
             width: 30px;
@@ -87,7 +87,7 @@
         }
 
         .toggle-btn:hover {
-            background: #2563eb;
+            background: #dc2626;
             transform: scale(1.1);
         }
 
@@ -96,6 +96,10 @@
             height: 50px !important;
             overflow: hidden !important;
             padding: 10px !important;
+        }
+        
+        .panel-minimized .resize-handle {
+            display: none !important;
         }
 
         .panel-minimized > *:not(.toggle-btn) {
@@ -963,11 +967,21 @@
             border-bottom-right-radius: 8px;
             opacity: 0.6;
             transition: opacity 0.2s;
+            touch-action: none; /* Para mejor control en móviles */
         }
 
         .resize-handle:hover {
             opacity: 1;
             background: linear-gradient(135deg, transparent 50%, #4299e1 50%);
+        }
+        
+        /* Resize handle más grande en móviles */
+        @media (max-width: 768px) {
+            .resize-handle {
+                width: 30px;
+                height: 30px;
+                opacity: 0.8;
+            }
         }
 
         /* Estado de resize activo */
@@ -1148,17 +1162,11 @@
     </div>
 
     <div class="control-panel" id="control-panel">
-        <div class="panel-controls">
-            <button class="panel-btn" onclick="togglePanelSize('control-panel')" title="Maximizar/Restaurar tamaño">
-                <span id="control-size-icon">⛶</span>
-            </button>
-            <button class="panel-btn" onclick="togglePanel('control-panel')" title="Minimizar/Expandir">
-                <span id="control-toggle-icon">−</span>
-            </button>
-        </div>
-        <div class="resize-indicator">⇱ Doble click para restaurar</div>
+        <button class="toggle-btn" onclick="togglePanel('control-panel')" title="Minimizar/Expandir">
+            <span id="control-toggle-icon">−</span>
+        </button>
         <h2 class="panel-header-clickable" ondblclick="resetPanelSize('control-panel')">🛰️ Geoportal <span class="success-badge">SATELITAL</span></h2>
-        <div class="resize-handle" onmousedown="startResize(event, 'control-panel')"></div>
+        <div class="resize-handle" onmousedown="startResize(event, 'control-panel')" ontouchstart="startResize(event, 'control-panel')"></div>
 
         <button class="toggle-all" onclick="toggleAllLayers()">✓ Activar/Desactivar Todas</button>
         
@@ -1456,17 +1464,11 @@
 
     <!-- Panel de Leyendas -->
     <div id="legends-panel" class="legends-panel" style="position: absolute; bottom: 20px; right: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); max-width: 300px; z-index: 1000; font-size: 11px;">
-        <div class="panel-controls">
-            <button class="panel-btn" onclick="togglePanelSize('legends-panel')" title="Maximizar/Restaurar tamaño">
-                <span id="legends-size-icon">⛶</span>
-            </button>
-            <button class="panel-btn" onclick="togglePanel('legends-panel')" title="Minimizar/Expandir">
-                <span id="legends-toggle-icon">−</span>
-            </button>
-        </div>
-        <div class="resize-indicator">⇱ Doble click para restaurar</div>
+        <button class="toggle-btn" onclick="togglePanel('legends-panel')" title="Minimizar/Expandir" style="top: 8px; right: 8px;">
+            <span id="legends-toggle-icon">−</span>
+        </button>
         <h3 class="panel-header-clickable" ondblclick="resetPanelSize('legends-panel')" style="font-size: 14px; margin: 0 0 10px 0; color: #2c5282; border-bottom: 2px solid #4299e1; padding-bottom: 5px;">Leyendas</h3>
-        <div class="resize-handle" onmousedown="startResize(event, 'legends-panel')"></div>
+        <div class="resize-handle" onmousedown="startResize(event, 'legends-panel')" ontouchstart="startResize(event, 'legends-panel')"></div>
         
         <div style="margin-bottom: 12px;">
             <strong style="font-size: 11px; color: #4a5568;">Volumen de Agua (hm³/año)</strong>
@@ -5500,13 +5502,32 @@
         function togglePanel(panelId) {
             const panel = document.getElementById(panelId);
             const icon = document.getElementById(panelId === 'control-panel' ? 'control-toggle-icon' : 'legends-toggle-icon');
+            const resizeHandle = panel.querySelector('.resize-handle');
             
             if (panel.classList.contains('panel-minimized')) {
+                // EXPANDIR: Remover clase minimized
                 panel.classList.remove('panel-minimized');
                 icon.textContent = '−';
+                
+                // Mostrar handle de resize
+                if (resizeHandle) {
+                    resizeHandle.style.display = 'block';
+                }
             } else {
+                // MINIMIZAR: Agregar clase minimized
                 panel.classList.add('panel-minimized');
                 icon.textContent = '+';
+                
+                // Ocultar handle de resize
+                if (resizeHandle) {
+                    resizeHandle.style.display = 'none';
+                }
+                
+                // CRÍTICO: Limpiar estilos inline que interfieren con el minimizado
+                panel.style.width = '';
+                panel.style.height = '';
+                panel.style.maxWidth = '';
+                panel.style.maxHeight = '';
             }
         }
 
@@ -5562,7 +5583,7 @@
         }
 
         /**
-         * Iniciar resize con drag
+         * Iniciar resize con drag (mouse o touch)
          */
         function startResize(event, panelId) {
             event.preventDefault();
@@ -5570,14 +5591,23 @@
             
             const panel = document.getElementById(panelId);
             
+            // No permitir resize si el panel está minimizado
+            if (panel.classList.contains('panel-minimized')) {
+                return;
+            }
+            
             // Guardar tamaño original si no existe
             savePanelOriginalSize(panelId);
+            
+            // Detectar si es touch o mouse
+            const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+            const clientY = event.touches ? event.touches[0].clientY : event.clientY;
             
             // Guardar estado inicial
             resizeState.isResizing = true;
             resizeState.currentPanel = panelId;
-            resizeState.startX = event.clientX;
-            resizeState.startY = event.clientY;
+            resizeState.startX = clientX;
+            resizeState.startY = clientY;
             resizeState.startWidth = panel.offsetWidth;
             resizeState.startHeight = panel.offsetHeight;
             
@@ -5585,9 +5615,11 @@
             document.body.classList.add('resizing');
             panel.classList.remove('panel-transitioning');
             
-            // Event listeners para mouse move y mouse up
+            // Event listeners para mouse y touch
             document.addEventListener('mousemove', doResize);
             document.addEventListener('mouseup', stopResize);
+            document.addEventListener('touchmove', doResize, { passive: false });
+            document.addEventListener('touchend', stopResize);
         }
 
         /**
@@ -5596,11 +5628,20 @@
         function doResize(event) {
             if (!resizeState.isResizing) return;
             
+            // Prevenir scroll en móviles durante resize
+            if (event.type === 'touchmove') {
+                event.preventDefault();
+            }
+            
             const panel = document.getElementById(resizeState.currentPanel);
             
+            // Detectar si es touch o mouse
+            const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+            const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+            
             // Calcular nuevo tamaño
-            const deltaX = event.clientX - resizeState.startX;
-            const deltaY = event.clientY - resizeState.startY;
+            const deltaX = clientX - resizeState.startX;
+            const deltaY = clientY - resizeState.startY;
             
             let newWidth = resizeState.startWidth + deltaX;
             let newHeight = resizeState.startHeight + deltaY;
@@ -5625,7 +5666,7 @@
         }
 
         /**
-         * Detener resize
+         * Detener resize (mouse o touch)
          */
         function stopResize() {
             if (!resizeState.isResizing) return;
@@ -5633,9 +5674,11 @@
             resizeState.isResizing = false;
             document.body.classList.remove('resizing');
             
-            // Remover event listeners
+            // Remover event listeners (mouse y touch)
             document.removeEventListener('mousemove', doResize);
             document.removeEventListener('mouseup', stopResize);
+            document.removeEventListener('touchmove', doResize);
+            document.removeEventListener('touchend', stopResize);
         }
 
         /**
