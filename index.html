@@ -5519,6 +5519,196 @@
             });
         }
 
+        // ============================================================
+        // SISTEMA DE RESIZE DE PANELES
+        // ============================================================
+
+        // Almacenar tamaños originales de los paneles
+        const panelOriginalSizes = {
+            'control-panel': null,
+            'legends-panel': null
+        };
+
+        // Almacenar estado de resize
+        const resizeState = {
+            isResizing: false,
+            currentPanel: null,
+            startX: 0,
+            startY: 0,
+            startWidth: 0,
+            startHeight: 0
+        };
+
+        // Almacenar estado de maximizado
+        const panelMaximizedState = {
+            'control-panel': false,
+            'legends-panel': false
+        };
+
+        /**
+         * Guardar tamaño original del panel
+         */
+        function savePanelOriginalSize(panelId) {
+            if (!panelOriginalSizes[panelId]) {
+                const panel = document.getElementById(panelId);
+                const computed = window.getComputedStyle(panel);
+                panelOriginalSizes[panelId] = {
+                    width: computed.width,
+                    height: computed.height,
+                    maxWidth: computed.maxWidth,
+                    maxHeight: computed.maxHeight
+                };
+            }
+        }
+
+        /**
+         * Iniciar resize con drag
+         */
+        function startResize(event, panelId) {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            const panel = document.getElementById(panelId);
+            
+            // Guardar tamaño original si no existe
+            savePanelOriginalSize(panelId);
+            
+            // Guardar estado inicial
+            resizeState.isResizing = true;
+            resizeState.currentPanel = panelId;
+            resizeState.startX = event.clientX;
+            resizeState.startY = event.clientY;
+            resizeState.startWidth = panel.offsetWidth;
+            resizeState.startHeight = panel.offsetHeight;
+            
+            // Agregar clase de resizing
+            document.body.classList.add('resizing');
+            panel.classList.remove('panel-transitioning');
+            
+            // Event listeners para mouse move y mouse up
+            document.addEventListener('mousemove', doResize);
+            document.addEventListener('mouseup', stopResize);
+        }
+
+        /**
+         * Realizar resize mientras se arrastra
+         */
+        function doResize(event) {
+            if (!resizeState.isResizing) return;
+            
+            const panel = document.getElementById(resizeState.currentPanel);
+            
+            // Calcular nuevo tamaño
+            const deltaX = event.clientX - resizeState.startX;
+            const deltaY = event.clientY - resizeState.startY;
+            
+            let newWidth = resizeState.startWidth + deltaX;
+            let newHeight = resizeState.startHeight + deltaY;
+            
+            // Límites mínimos
+            const minWidth = 250;
+            const minHeight = 200;
+            
+            // Límites máximos
+            const maxWidth = window.innerWidth * 0.9;
+            const maxHeight = window.innerHeight * 0.85;
+            
+            // Aplicar límites
+            newWidth = Math.max(minWidth, Math.min(newWidth, maxWidth));
+            newHeight = Math.max(minHeight, Math.min(newHeight, maxHeight));
+            
+            // Aplicar nuevo tamaño
+            panel.style.width = newWidth + 'px';
+            panel.style.height = newHeight + 'px';
+            panel.style.maxWidth = newWidth + 'px';
+            panel.style.maxHeight = newHeight + 'px';
+        }
+
+        /**
+         * Detener resize
+         */
+        function stopResize() {
+            if (!resizeState.isResizing) return;
+            
+            resizeState.isResizing = false;
+            document.body.classList.remove('resizing');
+            
+            // Remover event listeners
+            document.removeEventListener('mousemove', doResize);
+            document.removeEventListener('mouseup', stopResize);
+        }
+
+        /**
+         * Toggle entre tamaño normal y maximizado
+         */
+        function togglePanelSize(panelId) {
+            const panel = document.getElementById(panelId);
+            const icon = document.getElementById(panelId === 'control-panel' ? 'control-size-icon' : 'legends-size-icon');
+            
+            // Guardar tamaño original si no existe
+            savePanelOriginalSize(panelId);
+            
+            // Agregar clase de transición
+            panel.classList.add('panel-transitioning');
+            
+            if (panelMaximizedState[panelId]) {
+                // Restaurar tamaño original
+                resetPanelSize(panelId);
+            } else {
+                // Maximizar
+                panel.classList.add('panel-maximized');
+                panelMaximizedState[panelId] = true;
+                icon.textContent = '◱'; // Icono de restaurar
+            }
+            
+            // Remover clase de transición después de la animación
+            setTimeout(() => {
+                panel.classList.remove('panel-transitioning');
+            }, 300);
+        }
+
+        /**
+         * Resetear panel a tamaño original (doble click)
+         */
+        function resetPanelSize(panelId) {
+            const panel = document.getElementById(panelId);
+            const icon = document.getElementById(panelId === 'control-panel' ? 'control-size-icon' : 'legends-size-icon');
+            
+            if (!panelOriginalSizes[panelId]) {
+                savePanelOriginalSize(panelId);
+                return;
+            }
+            
+            // Agregar clase de transición
+            panel.classList.add('panel-transitioning');
+            
+            // Restaurar tamaño original
+            const original = panelOriginalSizes[panelId];
+            panel.style.width = original.width;
+            panel.style.height = original.height;
+            panel.style.maxWidth = original.maxWidth;
+            panel.style.maxHeight = original.maxHeight;
+            
+            // Remover clase de maximizado
+            panel.classList.remove('panel-maximized');
+            panelMaximizedState[panelId] = false;
+            icon.textContent = '⛶'; // Icono de maximizar
+            
+            // Remover clase de transición después de la animación
+            setTimeout(() => {
+                panel.classList.remove('panel-transitioning');
+            }, 300);
+        }
+
+        /**
+         * Guardar tamaños originales al cargar la página
+         */
+        window.addEventListener('load', () => {
+            savePanelOriginalSize('control-panel');
+            savePanelOriginalSize('legends-panel');
+        });
+
+
         // Iniciar al cargar
         window.addEventListener('load', async () => {
             // Función para esperar a que las librerías estén disponibles
@@ -6996,194 +7186,6 @@ function cleanupGPSMarker() {
     }
 }
 
-// ============================================================
-// SISTEMA DE RESIZE DE PANELES
-// ============================================================
-
-// Almacenar tamaños originales de los paneles
-const panelOriginalSizes = {
-    'control-panel': null,
-    'legends-panel': null
-};
-
-// Almacenar estado de resize
-const resizeState = {
-    isResizing: false,
-    currentPanel: null,
-    startX: 0,
-    startY: 0,
-    startWidth: 0,
-    startHeight: 0
-};
-
-// Almacenar estado de maximizado
-const panelMaximizedState = {
-    'control-panel': false,
-    'legends-panel': false
-};
-
-/**
- * Guardar tamaño original del panel
- */
-function savePanelOriginalSize(panelId) {
-    if (!panelOriginalSizes[panelId]) {
-        const panel = document.getElementById(panelId);
-        const computed = window.getComputedStyle(panel);
-        panelOriginalSizes[panelId] = {
-            width: computed.width,
-            height: computed.height,
-            maxWidth: computed.maxWidth,
-            maxHeight: computed.maxHeight
-        };
-    }
-}
-
-/**
- * Iniciar resize con drag
- */
-function startResize(event, panelId) {
-    event.preventDefault();
-    event.stopPropagation();
-    
-    const panel = document.getElementById(panelId);
-    
-    // Guardar tamaño original si no existe
-    savePanelOriginalSize(panelId);
-    
-    // Guardar estado inicial
-    resizeState.isResizing = true;
-    resizeState.currentPanel = panelId;
-    resizeState.startX = event.clientX;
-    resizeState.startY = event.clientY;
-    resizeState.startWidth = panel.offsetWidth;
-    resizeState.startHeight = panel.offsetHeight;
-    
-    // Agregar clase de resizing
-    document.body.classList.add('resizing');
-    panel.classList.remove('panel-transitioning');
-    
-    // Event listeners para mouse move y mouse up
-    document.addEventListener('mousemove', doResize);
-    document.addEventListener('mouseup', stopResize);
-}
-
-/**
- * Realizar resize mientras se arrastra
- */
-function doResize(event) {
-    if (!resizeState.isResizing) return;
-    
-    const panel = document.getElementById(resizeState.currentPanel);
-    
-    // Calcular nuevo tamaño
-    const deltaX = event.clientX - resizeState.startX;
-    const deltaY = event.clientY - resizeState.startY;
-    
-    let newWidth = resizeState.startWidth + deltaX;
-    let newHeight = resizeState.startHeight + deltaY;
-    
-    // Límites mínimos
-    const minWidth = 250;
-    const minHeight = 200;
-    
-    // Límites máximos
-    const maxWidth = window.innerWidth * 0.9;
-    const maxHeight = window.innerHeight * 0.85;
-    
-    // Aplicar límites
-    newWidth = Math.max(minWidth, Math.min(newWidth, maxWidth));
-    newHeight = Math.max(minHeight, Math.min(newHeight, maxHeight));
-    
-    // Aplicar nuevo tamaño
-    panel.style.width = newWidth + 'px';
-    panel.style.height = newHeight + 'px';
-    panel.style.maxWidth = newWidth + 'px';
-    panel.style.maxHeight = newHeight + 'px';
-}
-
-/**
- * Detener resize
- */
-function stopResize() {
-    if (!resizeState.isResizing) return;
-    
-    resizeState.isResizing = false;
-    document.body.classList.remove('resizing');
-    
-    // Remover event listeners
-    document.removeEventListener('mousemove', doResize);
-    document.removeEventListener('mouseup', stopResize);
-}
-
-/**
- * Toggle entre tamaño normal y maximizado
- */
-function togglePanelSize(panelId) {
-    const panel = document.getElementById(panelId);
-    const icon = document.getElementById(panelId === 'control-panel' ? 'control-size-icon' : 'legends-size-icon');
-    
-    // Guardar tamaño original si no existe
-    savePanelOriginalSize(panelId);
-    
-    // Agregar clase de transición
-    panel.classList.add('panel-transitioning');
-    
-    if (panelMaximizedState[panelId]) {
-        // Restaurar tamaño original
-        resetPanelSize(panelId);
-    } else {
-        // Maximizar
-        panel.classList.add('panel-maximized');
-        panelMaximizedState[panelId] = true;
-        icon.textContent = '◱'; // Icono de restaurar
-    }
-    
-    // Remover clase de transición después de la animación
-    setTimeout(() => {
-        panel.classList.remove('panel-transitioning');
-    }, 300);
-}
-
-/**
- * Resetear panel a tamaño original (doble click)
- */
-function resetPanelSize(panelId) {
-    const panel = document.getElementById(panelId);
-    const icon = document.getElementById(panelId === 'control-panel' ? 'control-size-icon' : 'legends-size-icon');
-    
-    if (!panelOriginalSizes[panelId]) {
-        savePanelOriginalSize(panelId);
-        return;
-    }
-    
-    // Agregar clase de transición
-    panel.classList.add('panel-transitioning');
-    
-    // Restaurar tamaño original
-    const original = panelOriginalSizes[panelId];
-    panel.style.width = original.width;
-    panel.style.height = original.height;
-    panel.style.maxWidth = original.maxWidth;
-    panel.style.maxHeight = original.maxHeight;
-    
-    // Remover clase de maximizado
-    panel.classList.remove('panel-maximized');
-    panelMaximizedState[panelId] = false;
-    icon.textContent = '⛶'; // Icono de maximizar
-    
-    // Remover clase de transición después de la animación
-    setTimeout(() => {
-        panel.classList.remove('panel-transitioning');
-    }, 300);
-}
-
-/**
- * Guardar tamaños originales al cargar la página
- */
-window.addEventListener('load', () => {
-    savePanelOriginalSize('control-panel');
-    savePanelOriginalSize('legends-panel');
-});
-</script>
+    </script>
 </body>
 </html>
