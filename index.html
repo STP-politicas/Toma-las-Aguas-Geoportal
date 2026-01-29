@@ -1048,6 +1048,27 @@
             <p style="font-size: 10px; color: #6b7280; margin: 5px 0 0 0; text-align: center;">Haz click en el mapa o ingresa coordenadas</p>
         </div>
         
+        <div class="layer-control">
+            <input type="checkbox" id="layer-proyectos-hidrosociales" checked>
+            <label for="layer-proyectos-hidrosociales">
+                <span class="color-indicator" style="background-color: #06b6d4;"></span>
+                🌱 Proyectos Hidrosociales
+            </label>
+            <span class="layer-count" id="count-proyectos-hidrosociales">0</span>
+        </div>
+        
+        <div id="add-hidrosocial-section" style="margin: 10px 0; padding: 12px; background: linear-gradient(135deg, #ecfdf5, #d1fae5); border-radius: 6px; border: 2px solid #10b981; display: none;">
+            <p style="font-size: 11px; color: #065f46; margin: 0 0 8px 0; font-weight: 600; line-height: 1.4;">
+                💧 Propón proyectos comunitarios para restaurar el ciclo del agua
+            </p>
+            <button id="add-hidrosocial-btn" style="width: 100%; padding: 10px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3); transition: all 0.2s;">
+                🌱 Proponer Proyecto Hidrosocial
+            </button>
+            <p style="font-size: 9px; color: #047857; margin: 6px 0 0 0; text-align: center; font-style: italic;">
+                Jardines de lluvia, humedales, reforestación, captación pluvial...
+            </p>
+        </div>
+        
         <div id="login-section" style="margin: 10px 0; padding: 10px; background: #fef3c7; border-radius: 4px; border: 1px solid #fbbf24;">
             <p style="font-size: 11px; color: #78350f; margin: 0 0 8px 0; font-weight: 600;">Inicia sesión para colaborar</p>
             <button id="show-login-btn" style="width: 100%; padding: 8px; background: #f59e0b; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; margin-bottom: 5px;">
@@ -1587,6 +1608,7 @@
         const COLORS = {
             proyectos: '#e53e3e',
             proyectosColab: '#9333ea',
+            proyectosHidrosociales: '#06b6d4',
             cuerposAgua: {
                 'piscina': '#ec4899',
                 'cenote_s_a': '#10b981',
@@ -1885,6 +1907,9 @@
                     // Cargar proyectos colaborativos
                     await loadCollaborativeProjects();
                     
+                    // Cargar proyectos hidrosociales
+                    await loadProyectosHidrosociales();
+                    
                     // Limpiar el hash de la URL después de procesar
                     if (hash) {
                         console.log('🧹 Limpiando URL...');
@@ -1918,6 +1943,7 @@
                         const username = currentUser.user_metadata?.username || currentUser.email.split('@')[0];
                         showUserSection(username);
                         await loadCollaborativeProjects();
+                        await loadProyectosHidrosociales();
                     }
                 } else if (event === 'USER_UPDATED') {
                     console.log('🔄 Usuario actualizado');
@@ -1931,7 +1957,9 @@
                     currentUser = null;
                     showLoginSection();
                     layerGroups.proyectosColab.clearLayers();
+                    layerGroups.proyectosHidrosociales.clearLayers();
                     updateLayerCount('proyectos-colab', 0);
+                    updateLayerCount('proyectos-hidrosociales', 0);
                 } else if (event === 'TOKEN_REFRESHED') {
                     console.log('🔄 Token actualizado');
                 }
@@ -1942,12 +1970,14 @@
             document.getElementById('login-section').style.display = 'block';
             document.getElementById('user-section').style.display = 'none';
             document.getElementById('add-project-section').style.display = 'none';
+            document.getElementById('add-hidrosocial-section').style.display = 'none';
         }
 
         function showUserSection(username) {
             document.getElementById('login-section').style.display = 'none';
             document.getElementById('user-section').style.display = 'block';
             document.getElementById('add-project-section').style.display = 'block';
+            document.getElementById('add-hidrosocial-section').style.display = 'block';
             document.getElementById('username-display').textContent = username;
         }
 
@@ -2481,6 +2511,222 @@
             }
         }
 
+        // ========== FUNCIONES PARA PROYECTOS HIDROSOCIALES ========== //
+        
+        async function loadProyectosHidrosociales() {
+            try {
+                const { data, error} = await supabaseClient
+                    .from('proyectos_hidrosociales')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (error) {
+                    console.warn('Tabla de proyectos hidrosociales no disponible:', error.message || 'Error desconocido');
+                    return;
+                }
+
+                if (data && data.length > 0) {
+                    updateLayerCount('proyectos-hidrosociales', data.length);
+                    renderProyectosHidrosociales(data);
+                    console.log(`✓ ${data.length} proyectos hidrosociales cargados`);
+                } else {
+                    updateLayerCount('proyectos-hidrosociales', 0);
+                    console.log('No hay proyectos hidrosociales todavía');
+                }
+            } catch (e) {
+                console.warn('Error cargando proyectos hidrosociales:', e.message || String(e));
+                updateLayerCount('proyectos-hidrosociales', 0);
+            }
+        }
+
+        async function addProyectoHidrosocial(projectData) {
+            if (!currentUser) {
+                alert('Debes iniciar sesión para proponer proyectos');
+                return;
+            }
+
+            const { data, error } = await supabaseClient
+                .from('proyectos_hidrosociales')
+                .insert([{
+                    user_id: currentUser.id,
+                    username: currentUser.user_metadata?.username || currentUser.email.split('@')[0],
+                    nombre_proyecto: projectData.nombre_proyecto,
+                    descripcion: projectData.descripcion || null,
+                    tipo_proyecto: projectData.tipo_proyecto || null,
+                    objetivos: projectData.objetivos || null,
+                    beneficios_esperados: projectData.beneficios_esperados || null,
+                    estado: projectData.estado || 'propuesto',
+                    fecha_inicio: projectData.fecha_inicio || null,
+                    participantes_estimados: projectData.participantes_estimados || null,
+                    presupuesto_estimado: projectData.presupuesto_estimado || null,
+                    organizacion: projectData.organizacion || null,
+                    contacto_email: projectData.contacto_email || null,
+                    contacto_telefono: projectData.contacto_telefono || null,
+                    lat: projectData.lat,
+                    lng: projectData.lng,
+                    area_m2: projectData.area_m2 || null
+                }])
+                .select();
+
+            if (error) throw error;
+
+            await loadProyectosHidrosociales();
+            return data;
+        }
+
+        async function updateProyectoHidrosocial(projectId, projectData) {
+            const { error } = await supabaseClient
+                .from('proyectos_hidrosociales')
+                .update(projectData)
+                .eq('id', projectId);
+            
+            if (error) throw error;
+        }
+
+        async function updateProyectoHidrosocialLocation(projectId, newLat, newLng) {
+            const { error } = await supabaseClient
+                .from('proyectos_hidrosociales')
+                .update({ lat: newLat, lng: newLng })
+                .eq('id', projectId);
+            
+            if (error) throw error;
+        }
+
+        async function deleteProyectoHidrosocial(projectId) {
+            if (!currentUser || currentUser.email !== 'storresperdigon@politicas.unam.mx') {
+                alert('❌ No tienes permisos para eliminar proyectos');
+                return;
+            }
+            
+            if (!confirm('⚠️ ¿Estás seguro de eliminar este proyecto de restauración hidrosocial?')) {
+                return;
+            }
+            
+            try {
+                map.closePopup();
+                
+                const { error } = await supabaseClient
+                    .from('proyectos_hidrosociales')
+                    .delete()
+                    .eq('id', projectId);
+                
+                if (error) throw error;
+                
+                await loadProyectosHidrosociales();
+                alert('✅ Proyecto eliminado exitosamente');
+            } catch (error) {
+                console.error('Error eliminando proyecto:', error);
+                alert('❌ Error al eliminar proyecto: ' + error.message);
+            }
+        }
+
+        async function getProyectoHidrosocialById(projectId) {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('proyectos_hidrosociales')
+                    .select('*')
+                    .eq('id', projectId)
+                    .single();
+                
+                if (error) {
+                    console.error('Error obteniendo proyecto:', error);
+                    return null;
+                }
+                
+                return data;
+            } catch (e) {
+                console.error('Excepción obteniendo proyecto:', e);
+                return null;
+            }
+        }
+
+        async function editProyectoHidrosocial(projectId) {
+            try {
+                map.closePopup();
+                
+                const project = await getProyectoHidrosocialById(projectId);
+                if (!project) {
+                    alert('❌ Error: No se pudo cargar el proyecto');
+                    return;
+                }
+                
+                // Llenar el formulario
+                document.getElementById('edit-hidrosocial-id').value = project.id;
+                document.getElementById('edit-hidrosocial-nombre').value = project.nombre_proyecto || '';
+                document.getElementById('edit-hidrosocial-tipo').value = project.tipo_proyecto || '';
+                document.getElementById('edit-hidrosocial-descripcion').value = project.descripcion || '';
+                document.getElementById('edit-hidrosocial-objetivos').value = project.objetivos || '';
+                document.getElementById('edit-hidrosocial-beneficios').value = project.beneficios_esperados || '';
+                document.getElementById('edit-hidrosocial-lat').value = project.lat || '';
+                document.getElementById('edit-hidrosocial-lng').value = project.lng || '';
+                document.getElementById('edit-hidrosocial-area').value = project.area_m2 || '';
+                document.getElementById('edit-hidrosocial-estado').value = project.estado || 'propuesto';
+                document.getElementById('edit-hidrosocial-participantes').value = project.participantes_estimados || '';
+                document.getElementById('edit-hidrosocial-presupuesto').value = project.presupuesto_estimado || '';
+                document.getElementById('edit-hidrosocial-organizacion').value = project.organizacion || '';
+                document.getElementById('edit-hidrosocial-email').value = project.contacto_email || '';
+                document.getElementById('edit-hidrosocial-telefono').value = project.contacto_telefono || '';
+                
+                // Mostrar modal
+                document.getElementById('edit-hidrosocial-modal').style.display = 'flex';
+                
+            } catch (error) {
+                console.error('Error en editProyectoHidrosocial:', error);
+                alert('❌ Error al cargar proyecto: ' + error.message);
+            }
+        }
+
+        function moveProyectoHidrosocial(projectId, currentLat, currentLng) {
+            map.closePopup();
+            
+            alert(`📍 Modo de movimiento activado.\n\nHaz click en el mapa para mover el proyecto a una nueva ubicación.`);
+            
+            // Destacar el marcador actual
+            const currentMarker = Object.values(layerGroups.proyectosHidrosociales._layers).find(
+                layer => layer.projectId === projectId
+            );
+            
+            if (currentMarker) {
+                currentMarker.setStyle({
+                    fillColor: '#f59e0b',
+                    radius: 15,
+                    weight: 4
+                });
+            }
+            
+            // Activar modo click para mover
+            const moveClickHandler = async function(e) {
+                const newLat = e.latlng.lat;
+                const newLng = e.latlng.lng;
+                
+                if (confirm(`¿Mover proyecto a:\nLat: ${newLat.toFixed(6)}\nLng: ${newLng.toFixed(6)}?`)) {
+                    try {
+                        await updateProyectoHidrosocialLocation(projectId, newLat, newLng);
+                        await loadProyectosHidrosociales();
+                        alert('✅ Proyecto movido exitosamente');
+                    } catch (error) {
+                        alert('❌ Error al mover proyecto: ' + error.message);
+                    }
+                }
+                
+                // Desactivar handler
+                map.off('click', moveClickHandler);
+                map.getContainer().style.cursor = '';
+                
+                // Restaurar estilo del marcador
+                if (currentMarker) {
+                    currentMarker.setStyle({
+                        fillColor: '#10b981',
+                        radius: 12,
+                        weight: 3
+                    });
+                }
+            };
+            
+            map.on('click', moveClickHandler);
+            map.getContainer().style.cursor = 'crosshair';
+        }
+
         // ========== FUNCIONES HELPER PARA FORMATEO ========== //
         
         /**
@@ -2585,6 +2831,7 @@
                 layerGroups = {
                     proyectos: L.layerGroup(),
                     proyectosColab: L.layerGroup(),
+                    proyectosHidrosociales: L.layerGroup(),
                     descargas: L.layerGroup(),
                     extracciones: L.layerGroup(),
                     cuerposAgua: L.layerGroup(),
@@ -3195,6 +3442,12 @@
                     }
                 }
             } catch (e) { console.error('Error fraccionamientos POEL:', e); }
+
+            // PROYECTOS DE RESTAURACIÓN HIDROSOCIAL
+            try {
+                updateLoading('Cargando proyectos de restauración hidrosocial...');
+                await loadProyectosHidrosociales();
+            } catch (e) { console.error('Error proyectos hidrosociales:', e); }
         }
 
         function renderCuerposAgua(data) {
@@ -4671,6 +4924,295 @@
             console.log(`✓ ${rendered} fraccionamientos irregulares renderizados`);
         }
 
+        function renderProyectosHidrosociales(data) {
+            console.log('=== RENDERIZANDO PROYECTOS DE RESTAURACIÓN HIDROSOCIAL ===');
+            console.log('Total items:', data.length);
+            
+            let rendered = 0;
+            const isAdmin = currentUser && currentUser.email === 'storresperdigon@politicas.unam.mx';
+            
+            // Información educativa sobre ciclo hidrosocial
+            const infoHidrosocial = {
+                'infiltración': {
+                    icono: '💧',
+                    color: '#0ea5e9',
+                    explicacion: 'Facilita que el agua de lluvia penetre el suelo y recargue el acuífero en lugar de escurrir y perderse.'
+                },
+                'reforestación': {
+                    icono: '🌳',
+                    color: '#22c55e',
+                    explicacion: 'Los árboles nativos captan agua de lluvia, reducen escorrentía, aumentan infiltración y protegen el suelo.'
+                },
+                'captación_lluvia': {
+                    icono: '🏠',
+                    color: '#3b82f6',
+                    explicacion: 'Recolecta agua de lluvia de techos para uso doméstico, reduciendo extracción del acuífero.'
+                },
+                'biofiltros': {
+                    icono: '🌿',
+                    color: '#10b981',
+                    explicacion: 'Sistemas naturales que filtran contaminantes del agua antes de que llegue al acuífero kárstico.'
+                },
+                'humedales_artificiales': {
+                    icono: '🦆',
+                    color: '#14b8a6',
+                    explicacion: 'Tratan aguas residuales naturalmente usando plantas, protegiendo el acuífero de contaminación.'
+                },
+                'jardines_lluvia': {
+                    icono: '🌺',
+                    color: '#8b5cf6',
+                    explicacion: 'Áreas vegetadas que captan escorrentía, filtran contaminantes e infiltran agua limpia al subsuelo.'
+                },
+                'zanjas_infiltración': {
+                    icono: '🏞️',
+                    color: '#84cc16',
+                    explicacion: 'Canales que retienen y permiten infiltración lenta del agua de lluvia en lugar de drenarla rápido.'
+                },
+                'protección_cenotes': {
+                    icono: '🕳️',
+                    color: '#06b6d4',
+                    explicacion: 'Protege entradas directas al acuífero de contaminación y sobreexplotación.'
+                },
+                'restauración_manglar': {
+                    icono: '🌴',
+                    color: '#059669',
+                    explicacion: 'Restaura ecosistemas costeros que filtran agua y protegen de intrusión salina al acuífero.'
+                },
+                'desimpermeabilización': {
+                    icono: '🔨',
+                    color: '#f59e0b',
+                    explicacion: 'Remueve asfalto/concreto para permitir que el agua se infiltre naturalmente.'
+                },
+                'default': {
+                    icono: '💚',
+                    color: '#06b6d4',
+                    explicacion: 'Proyecto comunitario de defensa y restauración del ciclo hidrosocial.'
+                }
+            };
+            
+            data.forEach((item, index) => {
+                if (!item.lat || !item.lng || isNaN(item.lat) || isNaN(item.lng)) {
+                    console.warn('Proyecto sin coordenadas válidas:', item);
+                    return;
+                }
+                
+                const tipoProyecto = item.tipo_proyecto || 'default';
+                const info = infoHidrosocial[tipoProyecto] || infoHidrosocial.default;
+                
+                const marker = L.circleMarker([item.lat, item.lng], {
+                    radius: 12,
+                    fillColor: info.color,
+                    color: '#ffffff',
+                    weight: 3,
+                    opacity: 1,
+                    fillOpacity: 0.85,
+                    draggable: isAdmin
+                });
+                
+                const isOwner = currentUser && item.user_id === currentUser.id;
+                const ownerBadge = isOwner ? '<span style="background: #10b981; color: white; padding: 3px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; margin-left: 5px;">TU PROYECTO</span>' : '';
+                const adminBadge = isAdmin ? '<span style="background: #ef4444; color: white; padding: 3px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; margin-left: 5px;">ADMIN</span>' : '';
+                
+                let estadoBadge = '';
+                let estadoColor = '#6b7280';
+                if (item.estado === 'propuesto') {
+                    estadoBadge = '🌱 Propuesto';
+                    estadoColor = '#f59e0b';
+                } else if (item.estado === 'en_planificación') {
+                    estadoBadge = '📋 En Planificación';
+                    estadoColor = '#3b82f6';
+                } else if (item.estado === 'en_curso') {
+                    estadoBadge = '🔨 En Curso';
+                    estadoColor = '#8b5cf6';
+                } else if (item.estado === 'completado') {
+                    estadoBadge = '✅ Completado';
+                    estadoColor = '#10b981';
+                }
+                
+                let popupContent = `
+                    <div class="custom-popup" style="max-width: 450px;">
+                        <div style="background: linear-gradient(135deg, ${info.color}, ${info.color}dd); padding: 18px; border-radius: 8px 8px 0 0; margin: -15px -15px 15px -15px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+                            <div style="font-size: 36px; text-align: center; margin-bottom: 8px;">${info.icono}</div>
+                            <h3 style="color: white; margin: 0 0 8px 0; font-size: 18px; text-align: center; text-shadow: 1px 1px 3px rgba(0,0,0,0.3);">
+                                ${item.nombre_proyecto}
+                            </h3>
+                            <div style="text-align: center;">
+                                <span style="background: ${estadoColor}; color: white; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600; display: inline-block;">
+                                    ${estadoBadge}
+                                </span>
+                                ${ownerBadge}${adminBadge}
+                            </div>
+                        </div>
+                        
+                        <div class="custom-popup-divider" style="border-color: ${info.color};">
+                            <div style="background: #f0f9ff; padding: 12px; border-radius: 6px; margin-bottom: 15px; border-left: 4px solid ${info.color};">
+                                <p style="margin: 0; font-size: 13px; line-height: 1.6;">
+                                    <strong style="color: #1e40af;">💡 ¿Qué es este tipo de proyecto?</strong><br>
+                                    ${info.explicacion}
+                                </p>
+                            </div>
+                `;
+                
+                if (item.descripcion) {
+                    popupContent += `
+                        <div style="margin-bottom: 12px;">
+                            <p style="font-size: 13px; line-height: 1.5;"><strong>📝 Descripción:</strong><br>${item.descripcion}</p>
+                        </div>
+                    `;
+                }
+                
+                if (item.objetivos) {
+                    popupContent += `
+                        <div style="background: #ecfdf5; padding: 10px; border-radius: 6px; margin-bottom: 12px; border-left: 3px solid #10b981;">
+                            <p style="font-size: 12px; margin: 0; line-height: 1.5;"><strong style="color: #065f46;">🎯 Objetivos:</strong><br>${item.objetivos}</p>
+                        </div>
+                    `;
+                }
+                
+                if (item.beneficios_esperados) {
+                    popupContent += `
+                        <div style="background: #dbeafe; padding: 10px; border-radius: 6px; margin-bottom: 12px; border-left: 3px solid #3b82f6;">
+                            <p style="font-size: 12px; margin: 0; line-height: 1.5;"><strong style="color: #1e40af;">🌊 Beneficios para el ciclo del agua:</strong><br>${item.beneficios_esperados}</p>
+                        </div>
+                    `;
+                }
+                
+                // Información de participación
+                let participacionInfo = [];
+                if (item.participantes_estimados) {
+                    participacionInfo.push(`👥 ${item.participantes_estimados} participantes`);
+                }
+                if (item.area_m2) {
+                    participacionInfo.push(`📏 ${item.area_m2.toLocaleString('es-MX')} m²`);
+                }
+                if (item.fecha_inicio) {
+                    const fecha = new Date(item.fecha_inicio);
+                    participacionInfo.push(`📅 Inicio: ${fecha.toLocaleDateString('es-MX')}`);
+                }
+                
+                if (participacionInfo.length > 0) {
+                    popupContent += `
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
+                            ${participacionInfo.map(info => `
+                                <span style="background: #f3f4f6; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; color: #4b5563;">
+                                    ${info}
+                                </span>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+                
+                if (item.organizacion || item.contacto_email || item.contacto_telefono) {
+                    popupContent += `
+                        <div style="background: #fef3c7; padding: 10px; border-radius: 6px; margin-bottom: 12px; border-left: 3px solid #f59e0b;">
+                            <p style="font-size: 12px; margin: 0; line-height: 1.5;">
+                                <strong style="color: #78350f;">👥 Contacto para colaborar:</strong><br>
+                    `;
+                    if (item.organizacion) popupContent += `Organización: ${item.organizacion}<br>`;
+                    if (item.contacto_email) popupContent += `📧 ${item.contacto_email}<br>`;
+                    if (item.contacto_telefono) popupContent += `📞 ${item.contacto_telefono}`;
+                    popupContent += `</p></div>`;
+                }
+                
+                if (item.presupuesto_estimado) {
+                    popupContent += `
+                        <p style="font-size: 12px; margin-bottom: 12px;">
+                            <strong>💰 Presupuesto estimado:</strong> $${item.presupuesto_estimado.toLocaleString('es-MX')} MXN
+                        </p>
+                    `;
+                }
+                
+                // Sección educativa sobre ciclo hidrosocial
+                popupContent += `
+                    <div style="background: linear-gradient(135deg, #e0f2fe, #bae6fd); padding: 12px; border-radius: 8px; margin: 15px 0; border: 2px solid #38bdf8;">
+                        <p style="font-size: 11px; margin: 0; line-height: 1.6; color: #075985;">
+                            <strong style="font-size: 12px; color: #0c4a6e;">💧 ¿Por qué es importante defender el ciclo hidrosocial?</strong><br><br>
+                            En Puerto Morelos, el agua de lluvia debe <strong>infiltrarse naturalmente</strong> en el suelo kárstico para recargar el acuífero del que todos dependemos. 
+                            Los megaproyectos impermeabilizan el suelo, contaminan con lixiviados y sobreexplotan el agua subterránea.<br><br>
+                            <strong>Proyectos comunitarios como este son actos de resistencia territorial</strong> que demuestran que es posible 
+                            desarrollarnos en armonía con el ciclo natural del agua, no contra él.
+                        </p>
+                    </div>
+                `;
+                
+                popupContent += `
+                    <p style="color: #6b7280; font-size: 11px; margin-top: 12px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
+                        👤 Propuesto por: <strong>${item.username}</strong><br>
+                        📅 ${new Date(item.created_at).toLocaleDateString('es-MX')}<br>
+                        📍 Lat: ${item.lat.toFixed(6)}, Lng: ${item.lng.toFixed(6)}
+                    </p>
+                `;
+                
+                // Botones de acción
+                let ownerButtons = '';
+                if (isOwner && !isAdmin) {
+                    ownerButtons = `
+                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
+                            <button 
+                                class="edit-hidrosocial-btn" 
+                                data-project-id="${item.id}" 
+                                type="button"
+                                style="width: 100%; padding: 10px 12px; background: #f59e0b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; pointer-events: auto; touch-action: manipulation;"
+                                onclick="event.stopPropagation(); event.preventDefault(); editProyectoHidrosocial('${item.id}');"
+                            >
+                                ✏️ Editar mi proyecto
+                            </button>
+                        </div>
+                    `;
+                }
+                
+                let adminButtons = '';
+                if (isAdmin) {
+                    adminButtons = `
+                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
+                            <p style="font-size: 11px; color: #6b7280; margin-bottom: 8px;">⚙️ Controles de Administrador</p>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;">
+                                <button onclick="event.stopPropagation(); editProyectoHidrosocial('${item.id}');" style="padding: 8px; background: #f59e0b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; pointer-events: auto;">✏️ Editar</button>
+                                <button onclick="event.stopPropagation(); moveProyectoHidrosocial('${item.id}', ${item.lat}, ${item.lng});" style="padding: 8px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; pointer-events: auto;">📍 Mover</button>
+                                <button onclick="event.stopPropagation(); deleteProyectoHidrosocial('${item.id}');" style="padding: 8px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; pointer-events: auto;">🗑️ Borrar</button>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                popupContent += ownerButtons + adminButtons;
+                popupContent += `</div></div>`;
+                
+                marker.bindPopup(popupContent, {
+                    maxWidth: 480,
+                    minWidth: 320,
+                    className: 'hidrosocial-popup'
+                });
+                
+                // Drag para admin
+                if (isAdmin) {
+                    marker.on('dragend', async function(e) {
+                        const newLatLng = e.target.getLatLng();
+                        if (confirm('¿Mover este proyecto a la nueva ubicación?')) {
+                            try {
+                                map.closePopup();
+                                await updateProyectoHidrosocialLocation(item.id, newLatLng.lat, newLatLng.lng);
+                                await loadProyectosHidrosociales();
+                                alert('✅ Proyecto movido exitosamente');
+                            } catch (error) {
+                                alert('❌ Error: ' + error.message);
+                                e.target.setLatLng([item.lat, item.lng]);
+                            }
+                        } else {
+                            e.target.setLatLng([item.lat, item.lng]);
+                        }
+                    });
+                }
+                
+                marker.projectId = item.id;
+                marker.projectData = item;
+                marker.addTo(layerGroups.proyectosHidrosociales);
+                rendered++;
+            });
+            
+            console.log(`✓ ${rendered} proyectos hidrosociales renderizados`);
+        }
+
         // Controles de capas
         document.getElementById('layer-proyectos').addEventListener('change', (e) => {
             if (e.target.checked) map.addLayer(layerGroups.proyectos);
@@ -5065,6 +5607,13 @@
                 document.getElementById('add-project-success').style.display = 'none';
             });
 
+            // Event listener para agregar proyecto hidrosocial
+            document.getElementById('add-hidrosocial-btn').addEventListener('click', () => {
+                alert('✨ MODAL DE PROYECTOS HIDROSOCIALES\n\nEsta funcionalidad está en desarrollo.\n\nPermitirá proponer proyectos comunitarios como:\n\n🌱 Jardines de lluvia\n💧 Sistemas de captación pluvial\n🌿 Humedales de tratamiento\n🌳 Reforestación de zonas de recarga\n🕳️ Restauración de cenotes\n🌊 Biofiltros comunitarios');
+                // TODO: Abrir modal de proyectos hidrosociales cuando esté listo
+                // document.getElementById('add-hidrosocial-modal').style.display = 'flex';
+            });
+
             // Event delegation para botones en popups
             document.addEventListener('click', (e) => {
                 // Botón de editar proyecto
@@ -5362,7 +5911,695 @@
                 if (e.target.checked) map.addLayer(layerGroups.proyectosColab);
                 else map.removeLayer(layerGroups.proyectosColab);
             });
+
+            document.getElementById('layer-proyectos-hidrosociales')?.addEventListener('change', (e) => {
+                if (e.target.checked) map.addLayer(layerGroups.proyectosHidrosociales);
+                else map.removeLayer(layerGroups.proyectosHidrosociales);
+            });
         });
     </script>
+<!-- ============================================================ -->
+<!-- MODALES Y FUNCIONES COMPLETAS PARA PROYECTOS HIDROSOCIALES -->
+<!-- Insertar ANTES del cierre de </body> -->
+<!-- ============================================================ -->
+
+<!-- MODAL PARA AGREGAR PROYECTO HIDROSOCIAL -->
+<div id="add-hidrosocial-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10000; justify-content: center; align-items: center; overflow-y: auto;">
+    <div style="background: white; padding: 30px; border-radius: 12px; max-width: 650px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3); margin: 20px auto; max-height: 90vh; overflow-y: auto;">
+        <div style="background: linear-gradient(135deg, #10b981, #059669); padding: 20px; border-radius: 8px; margin: -30px -30px 20px -30px;">
+            <div style="font-size: 48px; text-align: center; margin-bottom: 10px;">🌱💧</div>
+            <h2 style="margin: 0; color: white; font-size: 22px; text-align: center; text-shadow: 1px 1px 3px rgba(0,0,0,0.3);">
+                Proponer Proyecto de Restauración Hidrosocial
+            </h2>
+            <p style="color: rgba(255,255,255,0.95); font-size: 13px; margin: 8px 0 0 0; text-align: center;">
+                Defiende el territorio mediante apropiación ciudadana y restauración del ciclo del agua
+            </p>
+        </div>
+        
+        <form id="add-hidrosocial-form">
+            <!-- Información básica -->
+            <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #3b82f6;">
+                <h3 style="margin: 0 0 12px 0; color: #1e40af; font-size: 15px;">📋 Información del Proyecto</h3>
+                
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 13px;">
+                        Nombre del Proyecto *
+                    </label>
+                    <input type="text" id="hidrosocial-nombre" required 
+                        placeholder="Ej: Jardín de Lluvia Comunitario Leona Vicario"
+                        style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                </div>
+                
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 13px;">
+                        Tipo de Proyecto *
+                    </label>
+                    <select id="hidrosocial-tipo" required 
+                        style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                        <option value="">Selecciona un tipo...</option>
+                        <option value="infiltración">💧 Sistema de Infiltración</option>
+                        <option value="reforestación">🌳 Reforestación Nativa</option>
+                        <option value="captación_lluvia">🏠 Captación de Agua de Lluvia</option>
+                        <option value="biofiltros">🌿 Biofiltros Naturales</option>
+                        <option value="humedales_artificiales">🦆 Humedales Artificiales</option>
+                        <option value="jardines_lluvia">🌺 Jardines de Lluvia</option>
+                        <option value="zanjas_infiltración">🏞️ Zanjas de Infiltración</option>
+                        <option value="protección_cenotes">🕳️ Protección de Cenotes</option>
+                        <option value="restauración_manglar">🌴 Restauración de Manglar</option>
+                        <option value="desimpermeabilización">🔨 Desimpermeabilización</option>
+                    </select>
+                </div>
+                
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 13px;">
+                        Descripción del Proyecto
+                    </label>
+                    <textarea id="hidrosocial-descripcion" rows="3" 
+                        placeholder="Describe brevemente el proyecto..."
+                        style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; resize: vertical;"></textarea>
+                </div>
+            </div>
+            
+            <!-- Objetivos e impacto -->
+            <div style="background: #ecfdf5; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #10b981;">
+                <h3 style="margin: 0 0 12px 0; color: #065f46; font-size: 15px;">🎯 Objetivos e Impacto</h3>
+                
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 13px;">
+                        Objetivos Hidrosociales
+                    </label>
+                    <textarea id="hidrosocial-objetivos" rows="2" 
+                        placeholder="Ej: Aumentar infiltración, proteger acuífero, captar agua de lluvia..."
+                        style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; resize: vertical;"></textarea>
+                </div>
+                
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 13px;">
+                        Beneficios Esperados
+                    </label>
+                    <textarea id="hidrosocial-beneficios" rows="2" 
+                        placeholder="Beneficios para el ciclo del agua, comunidad, ecosistema..."
+                        style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; resize: vertical;"></textarea>
+                </div>
+            </div>
+            
+            <!-- Ubicación -->
+            <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #f59e0b;">
+                <h3 style="margin: 0 0 12px 0; color: #78350f; font-size: 15px;">📍 Ubicación</h3>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 12px;">
+                            Latitud *
+                        </label>
+                        <input type="number" id="hidrosocial-lat" step="any" required
+                            placeholder="20.849"
+                            style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 12px;">
+                            Longitud *
+                        </label>
+                        <input type="number" id="hidrosocial-lng" step="any" required
+                            placeholder="-86.876"
+                            style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
+                    </div>
+                </div>
+                
+                <button type="button" id="enable-hidrosocial-map-click" 
+                    style="width: 100%; padding: 10px; background: #f59e0b; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);">
+                    📍 Capturar Coordenadas del Mapa
+                </button>
+            </div>
+            
+            <!-- Información adicional -->
+            <div style="background: #e0f2fe; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #0ea5e9;">
+                <h3 style="margin: 0 0 12px 0; color: #075985; font-size: 15px;">📊 Datos Adicionales</h3>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 12px;">
+                            Área (m²)
+                        </label>
+                        <input type="number" id="hidrosocial-area" min="0"
+                            placeholder="250"
+                            style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 12px;">
+                            Estado
+                        </label>
+                        <select id="hidrosocial-estado" 
+                            style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
+                            <option value="propuesto">🌱 Propuesto</option>
+                            <option value="en_planificación">📋 En Planificación</option>
+                            <option value="en_curso">🔨 En Curso</option>
+                            <option value="completado">✅ Completado</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 12px;">
+                            Participantes Estimados
+                        </label>
+                        <input type="number" id="hidrosocial-participantes" min="0"
+                            placeholder="15"
+                            style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 12px;">
+                            Presupuesto (MXN)
+                        </label>
+                        <input type="number" id="hidrosocial-presupuesto" min="0"
+                            placeholder="25000"
+                            style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Contacto -->
+            <div style="background: #fce7f3; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #ec4899;">
+                <h3 style="margin: 0 0 12px 0; color: #9f1239; font-size: 15px;">👥 Contacto y Colaboración</h3>
+                
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 13px;">
+                        Organización
+                    </label>
+                    <input type="text" id="hidrosocial-organizacion" 
+                        placeholder="Colectivo, vecinos, ejido..."
+                        style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 12px;">
+                            Email de Contacto
+                        </label>
+                        <input type="email" id="hidrosocial-email" 
+                            placeholder="ejemplo@email.com"
+                            style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 12px;">
+                            Teléfono
+                        </label>
+                        <input type="tel" id="hidrosocial-telefono" 
+                            placeholder="998-123-4567"
+                            style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Mensajes -->
+            <div id="add-hidrosocial-error" style="display: none; padding: 10px; background: #fee2e2; border: 1px solid #ef4444; border-radius: 6px; margin-bottom: 15px; color: #991b1b; font-size: 13px;"></div>
+            <div id="add-hidrosocial-success" style="display: none; padding: 10px; background: #d1fae5; border: 1px solid #10b981; border-radius: 6px; margin-bottom: 15px; color: #065f46; font-size: 13px;"></div>
+            
+            <!-- Botones -->
+            <div style="display: flex; gap: 10px;">
+                <button type="submit" 
+                    style="flex: 1; padding: 14px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 15px;">
+                    💾 Guardar Proyecto
+                </button>
+                <button type="button" id="close-add-hidrosocial-modal" 
+                    style="flex: 1; padding: 14px; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 15px;">
+                    Cancelar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL PARA EDITAR PROYECTO HIDROSOCIAL -->
+<div id="edit-hidrosocial-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10000; justify-content: center; align-items: center; overflow-y: auto;">
+    <div style="background: white; padding: 30px; border-radius: 12px; max-width: 650px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3); margin: 20px auto; max-height: 90vh; overflow-y: auto;">
+        <div style="background: linear-gradient(135deg, #f59e0b, #d97706); padding: 20px; border-radius: 8px; margin: -30px -30px 20px -30px;">
+            <div style="font-size: 48px; text-align: center; margin-bottom: 10px;">✏️💧</div>
+            <h2 style="margin: 0; color: white; font-size: 22px; text-align: center; text-shadow: 1px 1px 3px rgba(0,0,0,0.3);">
+                Editar Proyecto Hidrosocial
+            </h2>
+        </div>
+        
+        <form id="edit-hidrosocial-form">
+            <input type="hidden" id="edit-hidrosocial-id">
+            
+            <!-- Igual estructura que add-hidrosocial-modal pero con prefijo "edit-" -->
+            <!-- Información básica -->
+            <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #3b82f6;">
+                <h3 style="margin: 0 0 12px 0; color: #1e40af; font-size: 15px;">📋 Información del Proyecto</h3>
+                
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 13px;">
+                        Nombre del Proyecto *
+                    </label>
+                    <input type="text" id="edit-hidrosocial-nombre" required 
+                        style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                </div>
+                
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 13px;">
+                        Tipo de Proyecto *
+                    </label>
+                    <select id="edit-hidrosocial-tipo" required 
+                        style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                        <option value="infiltración">💧 Sistema de Infiltración</option>
+                        <option value="reforestación">🌳 Reforestación Nativa</option>
+                        <option value="captación_lluvia">🏠 Captación de Agua de Lluvia</option>
+                        <option value="biofiltros">🌿 Biofiltros Naturales</option>
+                        <option value="humedales_artificiales">🦆 Humedales Artificiales</option>
+                        <option value="jardines_lluvia">🌺 Jardines de Lluvia</option>
+                        <option value="zanjas_infiltración">🏞️ Zanjas de Infiltración</option>
+                        <option value="protección_cenotes">🕳️ Protección de Cenotes</option>
+                        <option value="restauración_manglar">🌴 Restauración de Manglar</option>
+                        <option value="desimpermeabilización">🔨 Desimpermeabilización</option>
+                    </select>
+                </div>
+                
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 13px;">
+                        Descripción
+                    </label>
+                    <textarea id="edit-hidrosocial-descripcion" rows="3" 
+                        style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; resize: vertical;"></textarea>
+                </div>
+            </div>
+            
+            <!-- Objetivos -->
+            <div style="background: #ecfdf5; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #10b981;">
+                <h3 style="margin: 0 0 12px 0; color: #065f46; font-size: 15px;">🎯 Objetivos e Impacto</h3>
+                
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 13px;">
+                        Objetivos
+                    </label>
+                    <textarea id="edit-hidrosocial-objetivos" rows="2" 
+                        style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; resize: vertical;"></textarea>
+                </div>
+                
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 13px;">
+                        Beneficios Esperados
+                    </label>
+                    <textarea id="edit-hidrosocial-beneficios" rows="2" 
+                        style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; resize: vertical;"></textarea>
+                </div>
+            </div>
+            
+            <!-- Ubicación -->
+            <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #f59e0b;">
+                <h3 style="margin: 0 0 12px 0; color: #78350f; font-size: 15px;">📍 Ubicación</h3>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 12px;">
+                            Latitud *
+                        </label>
+                        <input type="number" id="edit-hidrosocial-lat" step="any" required
+                            style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 12px;">
+                            Longitud *
+                        </label>
+                        <input type="number" id="edit-hidrosocial-lng" step="any" required
+                            style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Datos adicionales -->
+            <div style="background: #e0f2fe; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #0ea5e9;">
+                <h3 style="margin: 0 0 12px 0; color: #075985; font-size: 15px;">📊 Datos Adicionales</h3>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 12px;">
+                            Área (m²)
+                        </label>
+                        <input type="number" id="edit-hidrosocial-area" min="0"
+                            style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 12px;">
+                            Estado
+                        </label>
+                        <select id="edit-hidrosocial-estado" 
+                            style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
+                            <option value="propuesto">🌱 Propuesto</option>
+                            <option value="en_planificación">📋 En Planificación</option>
+                            <option value="en_curso">🔨 En Curso</option>
+                            <option value="completado">✅ Completado</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 12px;">
+                            Participantes
+                        </label>
+                        <input type="number" id="edit-hidrosocial-participantes" min="0"
+                            style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 12px;">
+                            Presupuesto (MXN)
+                        </label>
+                        <input type="number" id="edit-hidrosocial-presupuesto" min="0"
+                            style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Contacto -->
+            <div style="background: #fce7f3; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #ec4899;">
+                <h3 style="margin: 0 0 12px 0; color: #9f1239; font-size: 15px;">👥 Contacto</h3>
+                
+                <div style="margin-bottom: 12px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 13px;">
+                        Organización
+                    </label>
+                    <input type="text" id="edit-hidrosocial-organizacion" 
+                        style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 12px;">
+                            Email
+                        </label>
+                        <input type="email" id="edit-hidrosocial-email" 
+                            style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4a5568; font-size: 12px;">
+                            Teléfono
+                        </label>
+                        <input type="tel" id="edit-hidrosocial-telefono" 
+                            style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Mensajes -->
+            <div id="edit-hidrosocial-error" style="display: none; padding: 10px; background: #fee2e2; border: 1px solid #ef4444; border-radius: 6px; margin-bottom: 15px; color: #991b1b; font-size: 13px;"></div>
+            <div id="edit-hidrosocial-success" style="display: none; padding: 10px; background: #d1fae5; border: 1px solid #10b981; border-radius: 6px; margin-bottom: 15px; color: #065f46; font-size: 13px;"></div>
+            
+            <!-- Botones -->
+            <div style="display: flex; gap: 10px;">
+                <button type="submit" 
+                    style="flex: 1; padding: 14px; background: #f59e0b; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 15px;">
+                    💾 Actualizar Proyecto
+                </button>
+                <button type="button" id="close-edit-hidrosocial-modal" 
+                    style="flex: 1; padding: 14px; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 15px;">
+                    Cancelar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- INDICADOR DE CAPTURA EN MAPA -->
+<div id="map-click-indicator-hidrosocial" style="display: none; position: fixed; top: 120px; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 20px; border-radius: 12px; z-index: 9999; box-shadow: 0 8px 30px rgba(16, 185, 129, 0.4); text-align: center; max-width: 400px; border: 3px solid white;">
+    <div style="font-size: 48px; margin-bottom: 15px;">🎯💧</div>
+    <h3 style="margin: 0 0 10px 0; font-size: 18px;">Modo Captura Activado</h3>
+    <p style="margin: 0 0 15px 0; font-size: 14px;">Haz click en el mapa para seleccionar la ubicación del proyecto hidrosocial</p>
+    <button id="cancel-hidrosocial-map-click" 
+        style="padding: 10px 25px; background: white; color: #10b981; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; pointer-events: auto;">
+        ❌ Cancelar
+    </button>
+</div>
+
+<script>
+// ============================================================
+// FUNCIONES JAVASCRIPT PARA PROYECTOS HIDROSOCIALES
+// ============================================================
+
+// Variable global para tracking de modo click
+let mapClickEnabledHidrosocial = false;
+let tempMarkerHidrosocial = null;
+
+// Abrir modal de agregar
+document.getElementById('add-hidrosocial-btn')?.addEventListener('click', () => {
+    document.getElementById('add-hidrosocial-modal').style.display = 'flex';
+});
+
+// Cerrar modal de agregar
+document.getElementById('close-add-hidrosocial-modal')?.addEventListener('click', () => {
+    document.getElementById('add-hidrosocial-modal').style.display = 'none';
+    document.getElementById('add-hidrosocial-form').reset();
+    document.getElementById('add-hidrosocial-error').style.display = 'none';
+    document.getElementById('add-hidrosocial-success').style.display = 'none';
+});
+
+// Cerrar modal de editar
+document.getElementById('close-edit-hidrosocial-modal')?.addEventListener('click', () => {
+    document.getElementById('edit-hidrosocial-modal').style.display = 'none';
+    document.getElementById('edit-hidrosocial-form').reset();
+    document.getElementById('edit-hidrosocial-error').style.display = 'none';
+    document.getElementById('edit-hidrosocial-success').style.display = 'none';
+});
+
+// Activar captura de coordenadas en mapa
+document.getElementById('enable-hidrosocial-map-click')?.addEventListener('click', () => {
+    mapClickEnabledHidrosocial = true;
+    map.getContainer().style.cursor = 'crosshair';
+    document.getElementById('map-click-indicator-hidrosocial').style.display = 'block';
+    
+    // Ocultar el modal temporalmente
+    document.getElementById('add-hidrosocial-modal').style.display = 'none';
+});
+
+// Cancelar captura
+document.getElementById('cancel-hidrosocial-map-click')?.addEventListener('click', () => {
+    mapClickEnabledHidrosocial = false;
+    map.getContainer().style.cursor = '';
+    document.getElementById('map-click-indicator-hidrosocial').style.display = 'none';
+    document.getElementById('add-hidrosocial-modal').style.display = 'flex';
+    
+    if (tempMarkerHidrosocial) {
+        map.removeLayer(tempMarkerHidrosocial);
+        tempMarkerHidrosocial = null;
+    }
+});
+
+// Manejar click en mapa (agregar al event listener existente)
+map.on('click', function(e) {
+    if (mapClickEnabledHidrosocial) {
+        const lat = e.latlng.lat;
+        const lng = e.latlng.lng;
+        
+        // Actualizar inputs
+        document.getElementById('hidrosocial-lat').value = lat.toFixed(6);
+        document.getElementById('hidrosocial-lng').value = lng.toFixed(6);
+        
+        // Mostrar marcador temporal
+        if (tempMarkerHidrosocial) map.removeLayer(tempMarkerHidrosocial);
+        tempMarkerHidrosocial = L.circleMarker([lat, lng], {
+            radius: 15,
+            fillColor: '#10b981',
+            color: '#ffffff',
+            weight: 4,
+            opacity: 1,
+            fillOpacity: 0.9
+        }).addTo(map);
+        
+        // Desactivar modo captura
+        mapClickEnabledHidrosocial = false;
+        map.getContainer().style.cursor = '';
+        document.getElementById('map-click-indicator-hidrosocial').style.display = 'none';
+        document.getElementById('add-hidrosocial-modal').style.display = 'flex';
+        
+        alert(`✅ Ubicación capturada:\nLat: ${lat.toFixed(6)}\nLng: ${lng.toFixed(6)}`);
+    }
+});
+
+// Enviar formulario de agregar
+document.getElementById('add-hidrosocial-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const errorDiv = document.getElementById('add-hidrosocial-error');
+    const successDiv = document.getElementById('add-hidrosocial-success');
+    errorDiv.style.display = 'none';
+    successDiv.style.display = 'none';
+    
+    try {
+        const projectData = {
+            nombre_proyecto: document.getElementById('hidrosocial-nombre').value,
+            tipo_proyecto: document.getElementById('hidrosocial-tipo').value,
+            descripcion: document.getElementById('hidrosocial-descripcion').value || null,
+            objetivos: document.getElementById('hidrosocial-objetivos').value || null,
+            beneficios_esperados: document.getElementById('hidrosocial-beneficios').value || null,
+            estado: document.getElementById('hidrosocial-estado').value,
+            lat: parseFloat(document.getElementById('hidrosocial-lat').value),
+            lng: parseFloat(document.getElementById('hidrosocial-lng').value),
+            area_m2: parseFloat(document.getElementById('hidrosocial-area').value) || null,
+            participantes_estimados: parseInt(document.getElementById('hidrosocial-participantes').value) || null,
+            presupuesto_estimado: parseFloat(document.getElementById('hidrosocial-presupuesto').value) || null,
+            organizacion: document.getElementById('hidrosocial-organizacion').value || null,
+            contacto_email: document.getElementById('hidrosocial-email').value || null,
+            contacto_telefono: document.getElementById('hidrosocial-telefono').value || null
+        };
+        
+        await addProyectoHidrosocial(projectData);
+        
+        successDiv.textContent = '✅ ¡Proyecto hidrosocial guardado exitosamente!';
+        successDiv.style.display = 'block';
+        
+        setTimeout(() => {
+            document.getElementById('add-hidrosocial-modal').style.display = 'none';
+            document.getElementById('add-hidrosocial-form').reset();
+            successDiv.style.display = 'none';
+            
+            if (tempMarkerHidrosocial) {
+                map.removeLayer(tempMarkerHidrosocial);
+                tempMarkerHidrosocial = null;
+            }
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Error guardando proyecto:', error);
+        errorDiv.textContent = '❌ Error: ' + error.message;
+        errorDiv.style.display = 'block';
+    }
+});
+
+// Enviar formulario de editar
+document.getElementById('edit-hidrosocial-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const errorDiv = document.getElementById('edit-hidrosocial-error');
+    const successDiv = document.getElementById('edit-hidrosocial-success');
+    errorDiv.style.display = 'none';
+    successDiv.style.display = 'none';
+    
+    try {
+        const projectId = document.getElementById('edit-hidrosocial-id').value;
+        const projectData = {
+            nombre_proyecto: document.getElementById('edit-hidrosocial-nombre').value,
+            tipo_proyecto: document.getElementById('edit-hidrosocial-tipo').value,
+            descripcion: document.getElementById('edit-hidrosocial-descripcion').value || null,
+            objetivos: document.getElementById('edit-hidrosocial-objetivos').value || null,
+            beneficios_esperados: document.getElementById('edit-hidrosocial-beneficios').value || null,
+            estado: document.getElementById('edit-hidrosocial-estado').value,
+            lat: parseFloat(document.getElementById('edit-hidrosocial-lat').value),
+            lng: parseFloat(document.getElementById('edit-hidrosocial-lng').value),
+            area_m2: parseFloat(document.getElementById('edit-hidrosocial-area').value) || null,
+            participantes_estimados: parseInt(document.getElementById('edit-hidrosocial-participantes').value) || null,
+            presupuesto_estimado: parseFloat(document.getElementById('edit-hidrosocial-presupuesto').value) || null,
+            organizacion: document.getElementById('edit-hidrosocial-organizacion').value || null,
+            contacto_email: document.getElementById('edit-hidrosocial-email').value || null,
+            contacto_telefono: document.getElementById('edit-hidrosocial-telefono').value || null
+        };
+        
+        await updateProyectoHidrosocial(projectId, projectData);
+        await loadProyectosHidrosociales();
+        
+        successDiv.textContent = '✅ ¡Proyecto actualizado exitosamente!';
+        successDiv.style.display = 'block';
+        
+        setTimeout(() => {
+            document.getElementById('edit-hidrosocial-modal').style.display = 'none';
+            successDiv.style.display = 'none';
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Error actualizando proyecto:', error);
+        errorDiv.textContent = '❌ Error: ' + error.message;
+        errorDiv.style.display = 'block';
+    }
+});
+
+// Función EDIT mejorada
+async function editProyectoHidrosocial(projectId) {
+    try {
+        map.closePopup();
+        
+        const project = await getProyectoHidrosocialById(projectId);
+        if (!project) {
+            alert('❌ Error: No se pudo cargar el proyecto');
+            return;
+        }
+        
+        // Llenar el formulario
+        document.getElementById('edit-hidrosocial-id').value = project.id;
+        document.getElementById('edit-hidrosocial-nombre').value = project.nombre_proyecto || '';
+        document.getElementById('edit-hidrosocial-tipo').value = project.tipo_proyecto || '';
+        document.getElementById('edit-hidrosocial-descripcion').value = project.descripcion || '';
+        document.getElementById('edit-hidrosocial-objetivos').value = project.objetivos || '';
+        document.getElementById('edit-hidrosocial-beneficios').value = project.beneficios_esperados || '';
+        document.getElementById('edit-hidrosocial-lat').value = project.lat || '';
+        document.getElementById('edit-hidrosocial-lng').value = project.lng || '';
+        document.getElementById('edit-hidrosocial-area').value = project.area_m2 || '';
+        document.getElementById('edit-hidrosocial-estado').value = project.estado || 'propuesto';
+        document.getElementById('edit-hidrosocial-participantes').value = project.participantes_estimados || '';
+        document.getElementById('edit-hidrosocial-presupuesto').value = project.presupuesto_estimado || '';
+        document.getElementById('edit-hidrosocial-organizacion').value = project.organizacion || '';
+        document.getElementById('edit-hidrosocial-email').value = project.contacto_email || '';
+        document.getElementById('edit-hidrosocial-telefono').value = project.contacto_telefono || '';
+        
+        // Mostrar modal
+        document.getElementById('edit-hidrosocial-modal').style.display = 'flex';
+        
+    } catch (error) {
+        console.error('Error en editProyectoHidrosocial:', error);
+        alert('❌ Error al cargar proyecto: ' + error.message);
+    }
+}
+
+// Función MOVE mejorada
+function moveProyectoHidrosocial(projectId, currentLat, currentLng) {
+    map.closePopup();
+    
+    alert(`📍 Modo de movimiento activado.\n\nHaz click en el mapa para mover el proyecto a una nueva ubicación.`);
+    
+    // Destacar el marcador actual
+    const currentMarker = Object.values(layerGroups.proyectosHidrosociales._layers).find(
+        layer => layer.projectId === projectId
+    );
+    
+    if (currentMarker) {
+        currentMarker.setStyle({
+            fillColor: '#f59e0b',
+            radius: 15,
+            weight: 4
+        });
+    }
+    
+    // Activar modo click para mover
+    const moveClickHandler = async function(e) {
+        const newLat = e.latlng.lat;
+        const newLng = e.latlng.lng;
+        
+        if (confirm(`¿Mover proyecto a:\nLat: ${newLat.toFixed(6)}\nLng: ${newLng.toFixed(6)}?`)) {
+            try {
+                await updateProyectoHidrosocialLocation(projectId, newLat, newLng);
+                await loadProyectosHidrosociales();
+                alert('✅ Proyecto movido exitosamente');
+            } catch (error) {
+                alert('❌ Error al mover proyecto: ' + error.message);
+            }
+        }
+        
+        // Desactivar handler
+        map.off('click', moveClickHandler);
+        map.getContainer().style.cursor = '';
+        
+        // Restaurar estilo del marcador
+        if (currentMarker) {
+            currentMarker.setStyle({
+                fillColor: '#10b981',
+                radius: 12,
+                weight: 3
+            });
+        }
+    };
+    
+    map.on('click', moveClickHandler);
+    map.getContainer().style.cursor = 'crosshair';
+}
+</script>
 </body>
 </html>
