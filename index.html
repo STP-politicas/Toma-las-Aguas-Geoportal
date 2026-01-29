@@ -1263,6 +1263,34 @@
             </label>
             <span class="layer-count" id="count-tierras-parceladas">0</span>
         </div>
+
+        <h3>🏘️ Registro Agrario Nacional (RAN)</h3>
+        <div class="layer-control">
+            <input type="checkbox" id="layer-nucleos-agrarios" checked>
+            <label for="layer-nucleos-agrarios">
+                <span class="color-indicator" style="background-color: #6366f1;"></span>
+                Núcleos Agrarios
+            </label>
+            <span class="layer-count" id="count-nucleos-agrarios">0</span>
+        </div>
+        <div class="layer-control">
+            <input type="checkbox" id="layer-asentamientos-humanos" checked>
+            <label for="layer-asentamientos-humanos">
+                <span class="color-indicator" style="background-color: #ec4899;"></span>
+                Asentamientos Humanos
+            </label>
+            <span class="layer-count" id="count-asentamientos-humanos">0</span>
+        </div>
+        
+        <h3>⚠️ POEL/PDU 2024</h3>
+        <div class="layer-control">
+            <input type="checkbox" id="layer-fraccionamientos-poel" checked>
+            <label for="layer-fraccionamientos-poel">
+                <span class="color-indicator" style="background-color: #ef4444; border: 2px dashed #991b1b;"></span>
+                Fraccionamientos a Legalizar
+            </label>
+            <span class="layer-count" id="count-fraccionamientos-poel">0</span>
+        </div>
     </div>
 
     <!-- Panel de Leyendas -->
@@ -2577,7 +2605,10 @@
                     pozosSinProteccion: L.layerGroup(),
                     pozosConProteccion: L.layerGroup(),
                     tierrasComunales: L.layerGroup(),
-                    tierrasParceladas: L.layerGroup()
+                    tierrasParceladas: L.layerGroup(),
+                    nucleosAgrarios: L.layerGroup(),
+                    asentamientosHumanos: L.layerGroup(),
+                    fraccionamientosPOEL: L.layerGroup()
                 };
                 
                 // Crear mapa Leaflet
@@ -3101,6 +3132,69 @@
                     }
                 }
             } catch (e) { console.error('Error tierras parceladas:', e); }
+
+            // NÚCLEOS AGRARIOS (RAN)
+            try {
+                updateLoading('Cargando núcleos agrarios...');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('nucleos agrarios (ran) — zo_nucleosagrarios_ran_copy')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        updateLayerCount('nucleos-agrarios', data.length);
+                        renderNucleosAgrarios(data);
+                        console.log(`✓ ${data.length} núcleos agrarios cargados`);
+                    }
+                }
+            } catch (e) { console.error('Error núcleos agrarios:', e); }
+
+            // ASENTAMIENTOS HUMANOS (RAN)
+            try {
+                updateLoading('Cargando asentamientos humanos...');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('zona asentamientos humanos (RAN) — zo_asentamientoshumanos_ra')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        updateLayerCount('asentamientos-humanos', data.length);
+                        renderAsentamientosHumanos(data);
+                        console.log(`✓ ${data.length} asentamientos humanos cargados`);
+                    }
+                }
+            } catch (e) { console.error('Error asentamientos humanos:', e); }
+
+            // FRACCIONAMIENTOS IRREGULARES POEL
+            try {
+                updateLoading('Cargando fraccionamientos irregulares...');
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/${encodeURIComponent('fraccionamiento que busca legalizar el poel nuevo — fracc_poe')}?select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        updateLayerCount('fraccionamientos-poel', data.length);
+                        renderFraccionamientosPOEL(data);
+                        console.log(`✓ ${data.length} fraccionamientos irregulares cargados`);
+                    }
+                }
+            } catch (e) { console.error('Error fraccionamientos POEL:', e); }
         }
 
         function renderCuerposAgua(data) {
@@ -4376,6 +4470,207 @@
             console.log(`✓ ${rendered} zonas parceladas renderizadas`);
         }
 
+        function renderNucleosAgrarios(data) {
+            console.log('=== RENDERIZANDO NÚCLEOS AGRARIOS ===');
+            console.log('Total items:', data.length);
+            
+            let rendered = 0;
+            data.forEach((item, index) => {
+                const geom = parseGeometry(item);
+                if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+
+                const coords = parseGeoJSON(geom);
+                if (coords && coords.length > 0) {
+                    const polygon = L.polygon(coords, {
+                        color: '#6366f1',
+                        fillColor: '#6366f1',
+                        fillOpacity: 0.35,
+                        weight: 2,
+                        opacity: 0.8
+                    });
+
+                    const popupContent = `
+                        <div class="custom-popup">
+                            <h3 style="color: #6366f1;">🏘️ Núcleo Agrario (RAN)</h3>
+                            <div class="custom-popup-divider" style="border-color: #6366f1;">
+                                <p><strong>Nombre:</strong> ${item.NombreNucleoAgrario || item.nombre || 'N/A'}</p>
+                                <p><strong>Tipo:</strong> ${item.TipoNucleoAgrario || item.tipo || 'N/A'}</p>
+                                <p><strong>Municipio:</strong> ${item.NombreMunicipio || item.municipio || 'Puerto Morelos'}</p>
+                                ${item.Area || item.area ? `<p><strong>Área:</strong> ${parseFloat(item.Area || item.area).toLocaleString('es-MX')} ha</p>` : ''}
+                                
+                                <div style="margin-top: 10px; padding: 10px; background: #e0e7ff; border-left: 4px solid #6366f1;">
+                                    <strong>⚖️ Marco Legal (Ley Agraria):</strong>
+                                    <p style="font-size: 12px; margin: 5px 0;">
+                                        <strong>Art. 23:</strong> Las tierras ejidales comprenden parceladas, de uso común y del asentamiento humano.<br>
+                                        <strong>Art. 56:</strong> Cambios de uso requieren 2/3 de votos en asamblea.<br>
+                                        <strong>Art. 87:</strong> Modificaciones requieren autorización del RAN.<br>
+                                        <strong>Requisito ambiental:</strong> MIA ante SEMARNAT para cualquier desarrollo.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    polygon.bindPopup(popupContent, { maxWidth: 450 });
+                    
+                    polygon.on('mouseover', function() {
+                        this.setStyle({ fillOpacity: 0.55, weight: 3 });
+                    });
+                    polygon.on('mouseout', function() {
+                        this.setStyle({ fillOpacity: 0.35, weight: 2 });
+                    });
+
+                    polygon.addTo(layerGroups.nucleosAgrarios);
+                    rendered++;
+                }
+            });
+            
+            console.log(`✓ ${rendered} núcleos agrarios renderizados`);
+        }
+
+        function renderAsentamientosHumanos(data) {
+            console.log('=== RENDERIZANDO ASENTAMIENTOS HUMANOS ===');
+            console.log('Total items:', data.length);
+            
+            let rendered = 0;
+            data.forEach((item, index) => {
+                const geom = parseGeometry(item);
+                if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+
+                const coords = parseGeoJSON(geom);
+                if (coords && coords.length > 0) {
+                    const polygon = L.polygon(coords, {
+                        color: '#ec4899',
+                        fillColor: '#ec4899',
+                        fillOpacity: 0.40,
+                        weight: 2,
+                        opacity: 0.8
+                    });
+
+                    const popupContent = `
+                        <div class="custom-popup">
+                            <h3 style="color: #ec4899;">🏘️ Asentamiento Humano (RAN)</h3>
+                            <div class="custom-popup-divider" style="border-color: #ec4899;">
+                                <p><strong>Localidad:</strong> ${item.NombreLocalidad || item.localidad || 'N/A'}</p>
+                                <p><strong>Núcleo Agrario:</strong> ${item.NombreNucleoAgrario || item.nucleo || 'N/A'}</p>
+                                ${item.Area || item.area ? `<p><strong>Área:</strong> ${parseFloat(item.Area || item.area).toLocaleString('es-MX')} ha</p>` : ''}
+                                
+                                <div style="margin-top: 10px; padding: 10px; background: #fce7f3; border-left: 4px solid #ec4899;">
+                                    <strong>⚖️ Marco Legal (Ley Agraria Art. 63-72):</strong>
+                                    <p style="font-size: 12px; margin: 5px 0;">
+                                        Área necesaria para desarrollo de vida comunitaria del ejido.<br>
+                                        <strong>Art. 64:</strong> Solares inalienables, no transferibles a personas ajenas al ejido.<br>
+                                        <strong>Restricciones:</strong> Uso exclusivamente habitacional y de servicios comunitarios.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    polygon.bindPopup(popupContent, { maxWidth: 450 });
+                    
+                    polygon.on('mouseover', function() {
+                        this.setStyle({ fillOpacity: 0.60, weight: 3 });
+                    });
+                    polygon.on('mouseout', function() {
+                        this.setStyle({ fillOpacity: 0.40, weight: 2 });
+                    });
+
+                    polygon.addTo(layerGroups.asentamientosHumanos);
+                    rendered++;
+                }
+            });
+            
+            console.log(`✓ ${rendered} asentamientos humanos renderizados`);
+        }
+
+        function renderFraccionamientosPOEL(data) {
+            console.log('=== RENDERIZANDO FRACCIONAMIENTOS IRREGULARES POEL ===');
+            console.log('Total items:', data.length);
+            
+            let rendered = 0;
+            data.forEach((item, index) => {
+                const geom = parseGeometry(item);
+                if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) return;
+
+                const coords = parseGeoJSON(geom);
+                if (coords && coords.length > 0) {
+                    const polygon = L.polygon(coords, {
+                        color: '#ef4444',
+                        fillColor: '#ef4444',
+                        fillOpacity: 0.50,
+                        weight: 3,
+                        opacity: 0.9,
+                        dashArray: '10, 5'
+                    });
+
+                    const popupContent = `
+                        <div class="custom-popup">
+                            <div style="background: #fee2e2; padding: 12px; border-radius: 6px; margin-bottom: 12px; border: 2px solid #ef4444;">
+                                <h3 style="color: #991b1b; margin: 0 0 8px 0; display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-size: 24px;">🚨</span>
+                                    ALERTA CIUDADANA
+                                </h3>
+                                <p style="font-size: 13px; font-weight: 600; margin: 0; color: #7f1d1d;">
+                                    Fraccionamiento Irregular que el Municipio busca legalizar mediante POEL/PDU 2024
+                                </p>
+                            </div>
+                            
+                            <div class="custom-popup-divider" style="border-color: #ef4444;">
+                                ${item.Nombre || item.nombre ? `<p><strong>Nombre:</strong> ${item.Nombre || item.nombre}</p>` : ''}
+                                ${item.Area || item.area ? `<p><strong>Área:</strong> ${parseFloat(item.Area || item.area).toLocaleString('es-MX')} ha</p>` : ''}
+                                ${item.Lotes || item.lotes ? `<p><strong>Lotes:</strong> ${item.Lotes || item.lotes}</p>` : ''}
+                                
+                                <div style="margin-top: 12px; padding: 12px; background: #fef3c7; border-left: 4px solid #f59e0b;">
+                                    <strong>⚠️ Situación Legal:</strong>
+                                    <p style="font-size: 12px; margin: 5px 0 0 0;">
+                                        Desarrollo construido <strong>sin permisos ni MIA</strong>. El municipio busca legalizarlo retroactivamente mediante actualización del POEL/PDU 2024.
+                                    </p>
+                                </div>
+                                
+                                <div style="margin-top: 12px; padding: 12px; background: #fee2e2; border-left: 4px solid #ef4444;">
+                                    <strong>🌊 Implicaciones para Seguridad Hídrica:</strong>
+                                    <ul style="font-size: 12px; margin: 5px 0; padding-left: 20px;">
+                                        <li><strong>Precedente peligroso:</strong> Incentiva más construcciones ilegales</li>
+                                        <li><strong>Zona crítica:</strong> Sobre la Fractura Holbox-Xel-Há (reserva estratégica)</li>
+                                        <li><strong>Sin MIA:</strong> Sin evaluación de impacto ambiental hidrológico</li>
+                                        <li><strong>Impermeabilización:</strong> Reduce infiltración natural del acuífero</li>
+                                        <li><strong>Pozos ilegales:</strong> Extracción sin control ni concesión CONAGUA</li>
+                                        <li><strong>Aguas residuales:</strong> Riesgo de contaminación del acuífero kárstico</li>
+                                    </ul>
+                                </div>
+                                
+                                <div style="margin-top: 12px; padding: 12px; background: #dbeafe; border-left: 4px solid #3b82f6;">
+                                    <strong>👥 ¿Qué puedes hacer?</strong>
+                                    <ul style="font-size: 12px; margin: 5px 0; padding-left: 20px;">
+                                        <li>Participar en consultas públicas del POEL/PDU 2024</li>
+                                        <li>Exigir MIA retroactiva con evaluación hidrológica</li>
+                                        <li>Demandar transparencia: fechas de construcción vs permisos</li>
+                                        <li>Reportar a PROFEPA (ambiental) y CONAGUA (agua)</li>
+                                        <li>Exigir monitoreo de calidad del acuífero en la zona</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    polygon.bindPopup(popupContent, { maxWidth: 550 });
+                    
+                    polygon.on('mouseover', function() {
+                        this.setStyle({ fillOpacity: 0.70, weight: 4 });
+                    });
+                    polygon.on('mouseout', function() {
+                        this.setStyle({ fillOpacity: 0.50, weight: 3 });
+                    });
+
+                    polygon.addTo(layerGroups.fraccionamientosPOEL);
+                    rendered++;
+                }
+            });
+            
+            console.log(`✓ ${rendered} fraccionamientos irregulares renderizados`);
+        }
+
         // Controles de capas
         document.getElementById('layer-proyectos').addEventListener('change', (e) => {
             if (e.target.checked) map.addLayer(layerGroups.proyectos);
@@ -4495,6 +4790,21 @@
         document.getElementById('layer-tierras-parceladas').addEventListener('change', (e) => {
             if (e.target.checked) map.addLayer(layerGroups.tierrasParceladas);
             else map.removeLayer(layerGroups.tierrasParceladas);
+        });
+
+        document.getElementById('layer-nucleos-agrarios').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.nucleosAgrarios);
+            else map.removeLayer(layerGroups.nucleosAgrarios);
+        });
+
+        document.getElementById('layer-asentamientos-humanos').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.asentamientosHumanos);
+            else map.removeLayer(layerGroups.asentamientosHumanos);
+        });
+
+        document.getElementById('layer-fraccionamientos-poel').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(layerGroups.fraccionamientosPOEL);
+            else map.removeLayer(layerGroups.fraccionamientosPOEL);
         });
 
         // Función para minimizar/maximizar paneles
