@@ -5499,7 +5499,7 @@
         });
 
         // Función para minimizar/maximizar paneles
-        function togglePanel(panelId) {
+        window.togglePanel = function(panelId) {
             const panel = document.getElementById(panelId);
             const icon = document.getElementById(panelId === 'control-panel' ? 'control-toggle-icon' : 'legends-toggle-icon');
             const resizeHandle = panel.querySelector('.resize-handle');
@@ -5531,7 +5531,7 @@
             }
         }
 
-        function toggleAllLayers() {
+        window.toggleAllLayers = function() {
             const checkboxes = document.querySelectorAll('.layer-control input[type="checkbox"]');
             const firstChecked = checkboxes[0].checked;
             checkboxes.forEach(cb => {
@@ -5569,7 +5569,7 @@
         /**
          * Guardar tamaño original del panel
          */
-        function savePanelOriginalSize(panelId) {
+        window.savePanelOriginalSize = function(panelId) {
             if (!panelOriginalSizes[panelId]) {
                 const panel = document.getElementById(panelId);
                 const computed = window.getComputedStyle(panel);
@@ -5585,7 +5585,7 @@
         /**
          * Iniciar resize con drag (mouse o touch)
          */
-        function startResize(event, panelId) {
+        window.startResize = function(event, panelId) {
             event.preventDefault();
             event.stopPropagation();
             
@@ -5625,7 +5625,7 @@
         /**
          * Realizar resize mientras se arrastra
          */
-        function doResize(event) {
+        window.doResize = function(event) {
             if (!resizeState.isResizing) return;
             
             // Prevenir scroll en móviles durante resize
@@ -5668,7 +5668,7 @@
         /**
          * Detener resize (mouse o touch)
          */
-        function stopResize() {
+        window.stopResize = function() {
             if (!resizeState.isResizing) return;
             
             resizeState.isResizing = false;
@@ -5684,7 +5684,7 @@
         /**
          * Toggle entre tamaño normal y maximizado
          */
-        function togglePanelSize(panelId) {
+        window.togglePanelSize = function(panelId) {
             const panel = document.getElementById(panelId);
             const icon = document.getElementById(panelId === 'control-panel' ? 'control-size-icon' : 'legends-size-icon');
             
@@ -5713,7 +5713,7 @@
         /**
          * Resetear panel a tamaño original (doble click)
          */
-        function resetPanelSize(panelId) {
+        window.resetPanelSize = function(panelId) {
             const panel = document.getElementById(panelId);
             const icon = document.getElementById(panelId === 'control-panel' ? 'control-size-icon' : 'legends-size-icon');
             
@@ -5746,14 +5746,11 @@
         /**
          * Guardar tamaños originales al cargar la página
          */
-        window.addEventListener('load', () => {
+        window.addEventListener('load', async () => {
+            // Guardar tamaños originales de los paneles
             savePanelOriginalSize('control-panel');
             savePanelOriginalSize('legends-panel');
-        });
-
-
-        // Iniciar al cargar
-        window.addEventListener('load', async () => {
+            
             // Función para esperar a que las librerías estén disponibles
             async function waitForLibraries() {
                 let attempts = 0;
