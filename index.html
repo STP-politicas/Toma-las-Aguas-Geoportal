@@ -71,7 +71,7 @@
             position: absolute;
             top: 10px;
             right: 10px;
-            background: #3b82f6;
+            background: #ef4444;
             color: white;
             border: none;
             width: 30px;
@@ -87,7 +87,7 @@
         }
 
         .toggle-btn:hover {
-            background: #2563eb;
+            background: #dc2626;
             transform: scale(1.1);
         }
 
@@ -96,6 +96,10 @@
             height: 50px !important;
             overflow: hidden !important;
             padding: 10px !important;
+        }
+        
+        .panel-minimized .resize-handle {
+            display: none !important;
         }
 
         .panel-minimized > *:not(.toggle-btn) {
@@ -910,6 +914,128 @@
             background: transparent !important;
             border: none !important;
         }
+
+        /* ============================================================ */
+        /* SISTEMA DE RESIZE DE PANELES */
+        /* ============================================================ */
+        
+        /* Botones de control de panel */
+        .panel-controls {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            display: flex;
+            gap: 5px;
+            z-index: 10;
+        }
+
+        .panel-btn {
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            color: #4a5568;
+        }
+
+        .panel-btn:hover {
+            background: #f7fafc;
+            border-color: #4299e1;
+            color: #2c5282;
+            transform: scale(1.05);
+        }
+
+        .panel-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Handle de resize en la esquina */
+        .resize-handle {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 20px;
+            height: 20px;
+            cursor: nwse-resize;
+            background: linear-gradient(135deg, transparent 50%, #cbd5e0 50%);
+            border-bottom-right-radius: 8px;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+            touch-action: none; /* Para mejor control en móviles */
+        }
+
+        .resize-handle:hover {
+            opacity: 1;
+            background: linear-gradient(135deg, transparent 50%, #4299e1 50%);
+        }
+        
+        /* Resize handle más grande en móviles */
+        @media (max-width: 768px) {
+            .resize-handle {
+                width: 30px;
+                height: 30px;
+                opacity: 0.8;
+            }
+        }
+
+        /* Estado de resize activo */
+        .resizing {
+            user-select: none;
+            cursor: nwse-resize !important;
+        }
+
+        .resizing * {
+            cursor: nwse-resize !important;
+            user-select: none !important;
+        }
+
+        /* Panel maximizado */
+        .panel-maximized {
+            width: 90% !important;
+            max-width: 800px !important;
+            max-height: 85vh !important;
+            transition: all 0.3s ease;
+        }
+
+        /* Transición suave para resize */
+        .panel-transitioning {
+            transition: all 0.3s ease;
+        }
+
+        /* Indicador de doble click */
+        .panel-header-clickable {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .panel-header-clickable:hover {
+            background: rgba(66, 153, 225, 0.05);
+            border-radius: 4px;
+        }
+
+        /* Badge indicador */
+        .resize-indicator {
+            position: absolute;
+            top: 2px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 9px;
+            color: #718096;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+
+        .control-panel:hover .resize-indicator,
+        .legends-panel:hover .resize-indicator {
+            opacity: 0.7;
+        }
     </style>
 </head>
 <body>
@@ -1036,10 +1162,11 @@
     </div>
 
     <div class="control-panel" id="control-panel">
-        <button class="toggle-btn" onclick="togglePanel('control-panel')" title="Minimizar/Maximizar">
+        <button class="toggle-btn" onclick="togglePanel('control-panel')" title="Minimizar/Expandir">
             <span id="control-toggle-icon">−</span>
         </button>
-        <h2>🛰️ Geoportal <span class="success-badge">SATELITAL</span></h2>
+        <h2 class="panel-header-clickable" ondblclick="resetPanelSize('control-panel')">🛰️ Geoportal <span class="success-badge">SATELITAL</span></h2>
+        <div class="resize-handle" onmousedown="startResize(event, 'control-panel')" ontouchstart="startResize(event, 'control-panel')"></div>
 
         <button class="toggle-all" onclick="toggleAllLayers()">✓ Activar/Desactivar Todas</button>
         
@@ -1337,10 +1464,11 @@
 
     <!-- Panel de Leyendas -->
     <div id="legends-panel" class="legends-panel" style="position: absolute; bottom: 20px; right: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); max-width: 300px; z-index: 1000; font-size: 11px;">
-        <button class="toggle-btn" onclick="togglePanel('legends-panel')" title="Minimizar/Maximizar" style="top: 8px; right: 8px;">
+        <button class="toggle-btn" onclick="togglePanel('legends-panel')" title="Minimizar/Expandir" style="top: 8px; right: 8px;">
             <span id="legends-toggle-icon">−</span>
         </button>
-        <h3 style="font-size: 14px; margin: 0 0 10px 0; color: #2c5282; border-bottom: 2px solid #4299e1; padding-bottom: 5px;">Leyendas</h3>
+        <h3 class="panel-header-clickable" ondblclick="resetPanelSize('legends-panel')" style="font-size: 14px; margin: 0 0 10px 0; color: #2c5282; border-bottom: 2px solid #4299e1; padding-bottom: 5px;">Leyendas</h3>
+        <div class="resize-handle" onmousedown="startResize(event, 'legends-panel')" ontouchstart="startResize(event, 'legends-panel')"></div>
         
         <div style="margin-bottom: 12px;">
             <strong style="font-size: 11px; color: #4a5568;">Volumen de Agua (hm³/año)</strong>
@@ -5374,13 +5502,32 @@
         function togglePanel(panelId) {
             const panel = document.getElementById(panelId);
             const icon = document.getElementById(panelId === 'control-panel' ? 'control-toggle-icon' : 'legends-toggle-icon');
+            const resizeHandle = panel.querySelector('.resize-handle');
             
             if (panel.classList.contains('panel-minimized')) {
+                // EXPANDIR: Remover clase minimized
                 panel.classList.remove('panel-minimized');
                 icon.textContent = '−';
+                
+                // Mostrar handle de resize
+                if (resizeHandle) {
+                    resizeHandle.style.display = 'block';
+                }
             } else {
+                // MINIMIZAR: Agregar clase minimized
                 panel.classList.add('panel-minimized');
                 icon.textContent = '+';
+                
+                // Ocultar handle de resize
+                if (resizeHandle) {
+                    resizeHandle.style.display = 'none';
+                }
+                
+                // CRÍTICO: Limpiar estilos inline que interfieren con el minimizado
+                panel.style.width = '';
+                panel.style.height = '';
+                panel.style.maxWidth = '';
+                panel.style.maxHeight = '';
             }
         }
 
@@ -5392,6 +5539,218 @@
                 cb.dispatchEvent(new Event('change'));
             });
         }
+
+        // ============================================================
+        // SISTEMA DE RESIZE DE PANELES
+        // ============================================================
+
+        // Almacenar tamaños originales de los paneles
+        const panelOriginalSizes = {
+            'control-panel': null,
+            'legends-panel': null
+        };
+
+        // Almacenar estado de resize
+        const resizeState = {
+            isResizing: false,
+            currentPanel: null,
+            startX: 0,
+            startY: 0,
+            startWidth: 0,
+            startHeight: 0
+        };
+
+        // Almacenar estado de maximizado
+        const panelMaximizedState = {
+            'control-panel': false,
+            'legends-panel': false
+        };
+
+        /**
+         * Guardar tamaño original del panel
+         */
+        function savePanelOriginalSize(panelId) {
+            if (!panelOriginalSizes[panelId]) {
+                const panel = document.getElementById(panelId);
+                const computed = window.getComputedStyle(panel);
+                panelOriginalSizes[panelId] = {
+                    width: computed.width,
+                    height: computed.height,
+                    maxWidth: computed.maxWidth,
+                    maxHeight: computed.maxHeight
+                };
+            }
+        }
+
+        /**
+         * Iniciar resize con drag (mouse o touch)
+         */
+        function startResize(event, panelId) {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            const panel = document.getElementById(panelId);
+            
+            // No permitir resize si el panel está minimizado
+            if (panel.classList.contains('panel-minimized')) {
+                return;
+            }
+            
+            // Guardar tamaño original si no existe
+            savePanelOriginalSize(panelId);
+            
+            // Detectar si es touch o mouse
+            const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+            const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+            
+            // Guardar estado inicial
+            resizeState.isResizing = true;
+            resizeState.currentPanel = panelId;
+            resizeState.startX = clientX;
+            resizeState.startY = clientY;
+            resizeState.startWidth = panel.offsetWidth;
+            resizeState.startHeight = panel.offsetHeight;
+            
+            // Agregar clase de resizing
+            document.body.classList.add('resizing');
+            panel.classList.remove('panel-transitioning');
+            
+            // Event listeners para mouse y touch
+            document.addEventListener('mousemove', doResize);
+            document.addEventListener('mouseup', stopResize);
+            document.addEventListener('touchmove', doResize, { passive: false });
+            document.addEventListener('touchend', stopResize);
+        }
+
+        /**
+         * Realizar resize mientras se arrastra
+         */
+        function doResize(event) {
+            if (!resizeState.isResizing) return;
+            
+            // Prevenir scroll en móviles durante resize
+            if (event.type === 'touchmove') {
+                event.preventDefault();
+            }
+            
+            const panel = document.getElementById(resizeState.currentPanel);
+            
+            // Detectar si es touch o mouse
+            const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+            const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+            
+            // Calcular nuevo tamaño
+            const deltaX = clientX - resizeState.startX;
+            const deltaY = clientY - resizeState.startY;
+            
+            let newWidth = resizeState.startWidth + deltaX;
+            let newHeight = resizeState.startHeight + deltaY;
+            
+            // Límites mínimos
+            const minWidth = 250;
+            const minHeight = 200;
+            
+            // Límites máximos
+            const maxWidth = window.innerWidth * 0.9;
+            const maxHeight = window.innerHeight * 0.85;
+            
+            // Aplicar límites
+            newWidth = Math.max(minWidth, Math.min(newWidth, maxWidth));
+            newHeight = Math.max(minHeight, Math.min(newHeight, maxHeight));
+            
+            // Aplicar nuevo tamaño
+            panel.style.width = newWidth + 'px';
+            panel.style.height = newHeight + 'px';
+            panel.style.maxWidth = newWidth + 'px';
+            panel.style.maxHeight = newHeight + 'px';
+        }
+
+        /**
+         * Detener resize (mouse o touch)
+         */
+        function stopResize() {
+            if (!resizeState.isResizing) return;
+            
+            resizeState.isResizing = false;
+            document.body.classList.remove('resizing');
+            
+            // Remover event listeners (mouse y touch)
+            document.removeEventListener('mousemove', doResize);
+            document.removeEventListener('mouseup', stopResize);
+            document.removeEventListener('touchmove', doResize);
+            document.removeEventListener('touchend', stopResize);
+        }
+
+        /**
+         * Toggle entre tamaño normal y maximizado
+         */
+        function togglePanelSize(panelId) {
+            const panel = document.getElementById(panelId);
+            const icon = document.getElementById(panelId === 'control-panel' ? 'control-size-icon' : 'legends-size-icon');
+            
+            // Guardar tamaño original si no existe
+            savePanelOriginalSize(panelId);
+            
+            // Agregar clase de transición
+            panel.classList.add('panel-transitioning');
+            
+            if (panelMaximizedState[panelId]) {
+                // Restaurar tamaño original
+                resetPanelSize(panelId);
+            } else {
+                // Maximizar
+                panel.classList.add('panel-maximized');
+                panelMaximizedState[panelId] = true;
+                icon.textContent = '◱'; // Icono de restaurar
+            }
+            
+            // Remover clase de transición después de la animación
+            setTimeout(() => {
+                panel.classList.remove('panel-transitioning');
+            }, 300);
+        }
+
+        /**
+         * Resetear panel a tamaño original (doble click)
+         */
+        function resetPanelSize(panelId) {
+            const panel = document.getElementById(panelId);
+            const icon = document.getElementById(panelId === 'control-panel' ? 'control-size-icon' : 'legends-size-icon');
+            
+            if (!panelOriginalSizes[panelId]) {
+                savePanelOriginalSize(panelId);
+                return;
+            }
+            
+            // Agregar clase de transición
+            panel.classList.add('panel-transitioning');
+            
+            // Restaurar tamaño original
+            const original = panelOriginalSizes[panelId];
+            panel.style.width = original.width;
+            panel.style.height = original.height;
+            panel.style.maxWidth = original.maxWidth;
+            panel.style.maxHeight = original.maxHeight;
+            
+            // Remover clase de maximizado
+            panel.classList.remove('panel-maximized');
+            panelMaximizedState[panelId] = false;
+            icon.textContent = '⛶'; // Icono de maximizar
+            
+            // Remover clase de transición después de la animación
+            setTimeout(() => {
+                panel.classList.remove('panel-transitioning');
+            }, 300);
+        }
+
+        /**
+         * Guardar tamaños originales al cargar la página
+         */
+        window.addEventListener('load', () => {
+            savePanelOriginalSize('control-panel');
+            savePanelOriginalSize('legends-panel');
+        });
+
 
         // Iniciar al cargar
         window.addEventListener('load', async () => {
@@ -6869,6 +7228,7 @@ function cleanupGPSMarker() {
         gpsMarker = null;
     }
 }
-</script>
+
+    </script>
 </body>
 </html>
