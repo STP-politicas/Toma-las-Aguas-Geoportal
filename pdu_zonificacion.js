@@ -21,8 +21,17 @@
         areaMinima: 1,                  // m² — ignora traslapes menores (ruido numérico)
         // Opcional: ocupantes promedio por vivienda (ej. la cifra oficial del INEGI para el municipio).
         // Si lo dejas en null no se estima población.
-        ocupantesPorVivienda: null
+        ocupantesPorVivienda: null,
+        // En celulares el PDU no se descarga al abrir la página, sólo cuando se activa la capa
+        cargaDiferidaEnMovil: true,
+        // Simplificación de geometría en celulares (grados; 0.00001 ≈ 1 m). 0 = desactivada
+        simplificarEnMovil: 0.00001
     };
+
+    const ES_MOVIL = (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) ||
+        /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    // Diagnóstico: abrir la página con ?sinpdu desactiva por completo este módulo
+    const SIN_PDU = /[?&]sinpdu\b/.test(location.search);
 
     // Campos esperados del PDU (se buscan sin importar mayúsculas/minúsculas)
     const CAMPOS_PDU = ['id', 'Name', 'tipo', 'Clave', 'CVE', 'HAS', 'area_m2', 'COS', 'CUS', 'Niveles',
@@ -301,8 +310,14 @@
         f._porLote = !!(v && v.porLote);
     }
 
+    function asegurarPDU() {
+        if (!estado.cargaPromesa) estado.cargaPromesa = cargarPDU();
+        return estado.cargaPromesa;
+    }
+
     async function cargarPDU() {
         const cont = document.getElementById('count-pdu');
+        if (cont) cont.textContent = 'Cargando…';
         try { await cargarTurf(); } catch (e) { console.warn('[PDU] Turf no disponible todavía'); }
         try {
             const filas = await traerTodo();
@@ -325,12 +340,16 @@
                 props._k = estado.features.length;
                 const f = { type: 'Feature', properties: props, geometry: geom };
                 precalcular(f);
+                // En celulares se aligera la geometría para ahorrar memoria (≈1 m de tolerancia)
+                if (ES_MOVIL && PDU_CONFIG.simplificarEnMovil && typeof turf !== 'undefined') {
+                    try { turf.simplify(f, { tolerance: PDU_CONFIG.simplificarEnMovil, mutate: true }); } catch (e) { }
+                }
                 estado.features.push(f);
                 const tipo = (props.tipo || props.Name || 'Sin tipo').toString().trim();
                 (porTipo[tipo] = porTipo[tipo] || []).push(f);
             });
 
-            const renderer = L.canvas({ pane: 'pduPane', padding: 0.3 });
+            const renderer = L.canvas({ pane: 'pduPane', padding: ES_MOVIL ? 0.1 : 0.3 });
             estado.grupoPadre = L.layerGroup();
             Object.entries(porTipo).forEach(([tipo, feats]) => {
                 const g = L.geoJSON(feats, {
@@ -365,6 +384,7 @@
             console.error('[PDU] Error cargando zonificación:', e);
             if (cont) cont.textContent = '!';
             avisoPanel(`No se pudo leer la tabla «${esc(PDU_CONFIG.tabla)}». Verifica el nombre en PDU_CONFIG.tabla y que la política RLS permita lectura pública.`);
+            estado.cargaPromesa = null;   // permite reintentar
         }
     }
 
@@ -960,7 +980,13 @@
             <p class="pdu-hint">Activa «🏙️ PDU» y toca un polígono para ver la clasificación del municipio; con «Calcular» sabrás qué hay dentro. Regresa a «Otras capas» para consultar cenotes, pozos, proyectos y demás.</p>`;
         panel.appendChild(bloque);
 
-        document.getElementById('layer-pdu').addEventListener('change', e => {
+        const cbPDU = document.getElementById('layer-pdu');
+        if (ES_MOVIL && PDU_CONFIG.cargaDiferidaEnMovil) {
+            cbPDU.checked = false;
+            document.getElementById('count-pdu').textContent = 'Activar';
+        }
+        cbPDU.addEventListener('change', e => {
+            if (e.target.checked && !estado.grupoPadre) { asegurarPDU(); return; }
             if (!estado.grupoPadre) return;
             if (e.target.checked) map.addLayer(estado.grupoPadre); else map.removeLayer(estado.grupoPadre);
         });
@@ -1009,6 +1035,12 @@
     // El PDU se dibuja en un lienzo que cubre todo el mapa; si recibiera clics
     // taparía las demás capas. Por eso sólo responde cuando el modo PDU está activo.
     function setModo(pdu) {
+        if (pdu && !estado.grupoPadre) {
+            const cb = document.getElementById('layer-pdu');
+            if (cb) cb.checked = true;
+            estado.modoPDU = true;
+            asegurarPDU();            // al terminar de cargar, cargarPDU vuelve a aplicar el modo
+        }
         estado.modoPDU = !!pdu;
         const pane = map.getPane('pduPane');
         if (pane) {
@@ -1122,7 +1154,10 @@
         const zona = f
             ? `<div class="z" style="border-color:${colorDe(f.properties)}">Zona PDU: <strong>${esc(f.properties.tipo || 'Sin tipo')}</strong> ${esc(f.properties.CVE || '')}</div>
                <button type="button" onclick="PDU.calcular(${f.properties._k})">🧮 ¿Qué hay en este polígono?</button>`
-            : `<div class="z">Fuera de los polígonos del PDU</div>`;
+            : (estado.grupoPadre
+                ? `<div class="z">Fuera de los polígonos del PDU</div>`
+                : `<div class="z">Activa la capa del PDU para saber en qué zona estás.</div>
+                   <button type="button" onclick="PDU.cargarYUbicar()">🏙️ Cargar PDU</button>`);
         el.innerHTML = `
             <div class="t">📍 Estás aquí <span>±${fmtN(acc)} m</span></div>
             ${zona}
@@ -1130,8 +1165,21 @@
         el.classList.add('visible');
     }
 
+    async function cargarYUbicar() {
+        const cb = document.getElementById('layer-pdu');
+        if (cb) cb.checked = true;
+        await asegurarPDU();
+        const g = estado.gps;
+        if (g.ultimo) infoUbicacion(g.ultimo, g.circulo ? g.circulo.getRadius() : 0);
+    }
+
     // ---------- RESUMEN MUNICIPAL ----------
-    function resumenMunicipal() {
+    async function resumenMunicipal() {
+        if (!estado.grupoPadre) {
+            const cb = document.getElementById('layer-pdu');
+            if (cb) cb.checked = true;
+            await asegurarPDU();
+        }
         const porTipo = {};
         let tv = 0, tc = 0, lotes = 0;
         estado.features.forEach(f => {
@@ -1298,11 +1346,12 @@
         // Clic en mapa para proyectos hidrosociales (definido en index.html como window.clickHidrosocial)
         if (typeof window.clickHidrosocial === 'function') map.on('click', window.clickHidrosocial);
         cargarTurf().catch(e => console.warn('[PDU]', e.message));
-        await cargarPDU();
+        if (!(ES_MOVIL && PDU_CONFIG.cargaDiferidaEnMovil)) await asegurarPDU();
     }
 
-    window.PDU = { calcular, cerrar, copiar, zoom, detenerGPS, humedalesMunicipal, resumenMunicipal, config: PDU_CONFIG };
+    window.PDU = { calcular, cerrar, copiar, zoom, detenerGPS, humedalesMunicipal, resumenMunicipal, cargarYUbicar, config: PDU_CONFIG };
 
+    if (SIN_PDU) { console.log('[PDU] Módulo desactivado por ?sinpdu'); return; }
     if (document.readyState === 'complete') iniciar();
     else window.addEventListener('load', iniciar);
 })();
