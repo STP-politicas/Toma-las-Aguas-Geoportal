@@ -18,8 +18,15 @@
         tabla: 'porcentaje de viviendas en humedales pdu2026 copy',   // nombre exacto de la tabla en Supabase
         tamPagina: 1000,                // Supabase entrega máximo 1000 filas por petición
         turfURL: 'https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js',
-        areaMinima: 1                   // m² — ignora traslapes menores (ruido numérico)
+        areaMinima: 1,                  // m² — ignora traslapes menores (ruido numérico)
+        // Opcional: ocupantes promedio por vivienda (ej. la cifra oficial del INEGI para el municipio).
+        // Si lo dejas en null no se estima población.
+        ocupantesPorVivienda: null
     };
+
+    // Campos esperados del PDU (se buscan sin importar mayúsculas/minúsculas)
+    const CAMPOS_PDU = ['id', 'Name', 'tipo', 'Clave', 'CVE', 'HAS', 'area_m2', 'COS', 'CUS', 'Niveles',
+        'Altura', 'Rst_frn', 'Rst_fnd', 'Rest_lt', 'Den_viv', 'Den_Cts'];
 
     // Colores por Clave de uso de suelo
     const PDU_COLORES = {
@@ -57,7 +64,9 @@
         grupoPadre: null,
         opacidad: 0.45,
         seleccion: null,
-        ultimoResumen: ''
+        ultimoResumen: '',
+        modoPDU: false,          // false: el clic va a las demás capas; true: el clic consulta el PDU
+        gps: { watch: null, marker: null, circulo: null, primera: true, ultimo: null }
     };
 
     // ---------------- UTILIDADES ----------------
@@ -88,15 +97,31 @@
         return n <= 1 ? n : n / 100;
     }
 
-    // "60 viviendas/hectárea", "1 vivienda por cada 167 m2 de terreno", "1 vivienda por lote"
+    // Interpreta la densidad que asigna el PDU y calcula el máximo de unidades.
+    // Admite: "60 viviendas/hectárea", "60 viv/ha", "1 vivienda por cada 167 m2 de terreno",
+    // "1 vivienda por lote", "80 cuartos/hectárea", o un número solo (se interpreta por hectárea).
     function parseDensidad(v, areaM2) {
         if (vacio(v) || String(v).trim() === '0') return null;
         const s = String(v).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        let m = s.match(/([\d.,]+)\s*(viviendas?|cuartos?)\s*\/\s*hect/);
-        if (m) return { valor: parseNum(m[1]) * areaM2 / 10000, texto: v };
-        m = s.match(/([\d.,]+)\s*(viviendas?|cuartos?)\s*por\s*cada\s*([\d.,]+)\s*m/);
-        if (m) return { valor: parseNum(m[1]) * areaM2 / parseNum(m[3]), texto: v };
-        if (s.includes('por lote')) return { valor: null, texto: v };
+        const ha = areaM2 / 10000;
+        let m = s.match(/([\d.,]+)\s*[a-z]*\s*(?:\/|por|x)\s*(?:ha\b|has\b|hect)/);
+        if (m) {
+            const n = parseNum(m[1]);
+            return { valor: n * ha, texto: v, regla: `${fmtN(n, 2)} por hectárea`,
+                formula: `${fmtN(n, 2)} × ${fmtN(ha, 2)} ha` };
+        }
+        m = s.match(/([\d.,]+)\s*[a-z]*\s*por\s*cada\s*([\d.,]+)\s*m/);
+        if (m) {
+            const n = parseNum(m[1]), lote = parseNum(m[2]);
+            return { valor: n * areaM2 / lote, texto: v, regla: `${fmtN(n)} por cada ${fmtN(lote)} m²`,
+                formula: `${fmtN(areaM2)} m² ÷ ${fmtN(lote)} m²${n !== 1 ? ` × ${fmtN(n)}` : ''}` };
+        }
+        if (/por\s*lote/.test(s)) return { valor: null, texto: v, porLote: true };
+        if (/^[\d.,]+$/.test(s.trim())) {
+            const n = parseNum(s);
+            return { valor: n * ha, texto: v, regla: `${fmtN(n, 2)} por hectárea`, supuesto: true,
+                formula: `${fmtN(n, 2)} × ${fmtN(ha, 2)} ha` };
+        }
         return { valor: null, texto: v };
     }
 
@@ -257,8 +282,28 @@
         return { color: c, weight: 1, opacity: 0.9, fillColor: c, fillOpacity: estado.opacidad };
     }
 
+    function areaDe(f) {
+        const a = parseNum(f.properties.area_m2);
+        if (a && a > 0) return a;
+        const h = parseNum(f.properties.HAS);
+        if (h && h > 0) return h * 10000;
+        try { return typeof turf !== 'undefined' ? turf.area(f) : 0; } catch (e) { return 0; }
+    }
+
+    // Viviendas y cuartos que asigna el PDU a cada polígono (para el resumen municipal)
+    function precalcular(f) {
+        const area = areaDe(f);
+        const v = parseDensidad(f.properties.Den_viv, area);
+        const c = parseDensidad(f.properties.Den_Cts, area);
+        f._area = area;
+        f._viv = v && v.valor ? Math.floor(v.valor) : 0;
+        f._cua = c && c.valor ? Math.floor(c.valor) : 0;
+        f._porLote = !!(v && v.porLote);
+    }
+
     async function cargarPDU() {
         const cont = document.getElementById('count-pdu');
+        try { await cargarTurf(); } catch (e) { console.warn('[PDU] Turf no disponible todavía'); }
         try {
             const filas = await traerTodo();
             let sinGeom = 0;
@@ -270,8 +315,16 @@
                 Object.keys(item).forEach(k => {
                     if (!['geom', 'geojson', 'geometry', 'the_geom', 'wkb_geometry'].includes(k)) props[k] = item[k];
                 });
+                // Si Supabase guardó los nombres en minúsculas (den_viv, cos…), los homologamos
+                CAMPOS_PDU.forEach(c => {
+                    if (props[c] === undefined) {
+                        const k = Object.keys(props).find(x => x.toLowerCase() === c.toLowerCase());
+                        if (k) props[c] = props[k];
+                    }
+                });
                 props._k = estado.features.length;
                 const f = { type: 'Feature', properties: props, geometry: geom };
+                precalcular(f);
                 estado.features.push(f);
                 const tipo = (props.tipo || props.Name || 'Sin tipo').toString().trim();
                 (porTipo[tipo] = porTipo[tipo] || []).push(f);
@@ -300,6 +353,10 @@
             if (cont) { cont.textContent = estado.features.length; cont.classList.add('loaded'); }
             construirFiltros(porTipo);
             construirLeyenda(porTipo);
+            setModo(estado.modoPDU);
+            const tv = estado.features.reduce((s, f) => s + f._viv, 0);
+            const el = document.getElementById('pdu-total-viv');
+            if (el) el.textContent = fmtN(tv);
             console.log(`✓ PDU: ${estado.features.length} polígonos cargados (${sinGeom} sin geometría)`);
             if (sinGeom && !estado.features.length) {
                 avisoPanel('La tabla del PDU cargó, pero ninguna fila trae geometría legible. Revisa el nombre de la columna de geometría.');
@@ -371,8 +428,7 @@
         const obj = { feature, bbox: turf.bbox(feature) };
         const ctx = { errores: 0 };
         const areaGeom = turf.area(feature);
-        const areaAttr = parseNum(p.area_m2);
-        const area = areaAttr && areaAttr > 0 ? areaAttr : areaGeom;
+        const area = areaDe(f) || areaGeom;   // misma superficie que usa el resumen municipal
         const R = { area, areaGeom };
 
         const dentro = (lng, lat) =>
@@ -528,6 +584,11 @@
         R.construible = cus ? area * cus : (cos && niveles ? area * cos * niveles : null);
         R.viviendas = parseDensidad(p.Den_viv, area);
         R.cuartos = parseDensidad(p.Den_Cts, area);
+        // Proporción del polígono ocupada por humedales (sobre la geometría real)
+        R.fraccHumedal = areaGeom > 0 ? Math.min(1, R.humedalTotal / areaGeom) : 0;
+        R.fraccKarst = areaGeom > 0 ? Math.min(1, R.karst.a / areaGeom) : 0;
+        R.vivHumedal = R.viviendas && R.viviendas.valor ? R.viviendas.valor * R.fraccHumedal : null;
+        R.cuaHumedal = R.cuartos && R.cuartos.valor ? R.cuartos.valor * R.fraccHumedal : null;
         const clave = String(p.Clave || '').toUpperCase().trim();
         R.permite = (cos && cos > 0) || (R.viviendas && R.viviendas.valor > 0) || (R.cuartos && R.cuartos.valor > 0) || CLAVES_URBANIZABLES.includes(clave);
 
@@ -535,6 +596,8 @@
         R.alertas = [];
         if (R.permite) {
             if (R.humedalTotal > 0) R.alertas.push(`El PDU permite aprovechamiento urbano sobre ${fmtM2(R.humedalTotal)} de humedales o zonas inundables${pct(R.humedalTotal, area)} del polígono.`);
+            if (R.vivHumedal >= 1) R.alertas.push(`De las viviendas que el PDU prospecta aquí, alrededor de ${fmtN(Math.round(R.vivHumedal))} quedarían asentadas sobre humedal.`);
+            if (R.cuaHumedal >= 1) R.alertas.push(`De los cuartos turísticos prospectados, alrededor de ${fmtN(Math.round(R.cuaHumedal))} quedarían sobre humedal.`);
             const cenotes = R.cuerpos.filter(c => /Cenote|naturales/.test(c.nombre));
             if (cenotes.length) R.alertas.push(`Hay ${cenotes.map(c => `${c.n} ${c.nombre.toLowerCase()}`).join(', ')} dentro de un polígono con uso urbanizable.`);
             const poelProt = Object.entries(R.poel).filter(([k]) => /Protecci|Conservaci|Preservaci/.test(k.split('|')[1]));
@@ -564,6 +627,43 @@
     const linea = (etq, val, extra = '') => `<div class="pdu-row"><span>${etq}</span><strong>${val}</strong>${extra ? `<em>${extra}</em>` : ''}</div>`;
     const nada = t => `<div class="pdu-nada">${t}</div>`;
 
+    // Sección explicativa de la carga habitacional que el PDU asigna al polígono
+    function bloqueProspeccion(R, p) {
+        const v = R.viviendas, c = R.cuartos;
+        if (!v && !c) {
+            return seccion('🏘️ Viviendas prospectadas por el PDU', [
+                `<p class="pdu-explica">Este polígono no tiene densidad habitacional ni hotelera asignada; el PDU no prospecta viviendas aquí.</p>`
+            ]);
+        }
+        const piezas = [];
+        const tarjeta = (titulo, d, enHum, unidad) => {
+            if (d.valor === null) {
+                return `<div class="pdu-prosp">
+                    <div class="pdu-prosp-t">${titulo}</div>
+                    <div class="pdu-prosp-n">—</div>
+                    <p class="pdu-explica">${d.porLote
+                        ? `La densidad se fija «por lote» (${esc(d.texto)}). Sin el número de lotes no es posible calcular un total; cada lote puede alojar lo indicado.`
+                        : `La densidad asignada («${esc(d.texto)}») no tiene un formato que permita calcular un total.`}</p>
+                </div>`;
+            }
+            const total = Math.floor(d.valor);
+            return `<div class="pdu-prosp">
+                <div class="pdu-prosp-t">${titulo}</div>
+                <div class="pdu-prosp-n">${fmtN(total)} <small>${unidad}</small></div>
+                <div class="pdu-formula">${esc(d.formula)} = ${fmtN(d.valor, 1)}</div>
+                <p class="pdu-explica">Densidad asignada: <strong>${esc(d.texto)}</strong>${d.supuesto ? ' (cifra sin unidad, interpretada por hectárea)' : ''}.</p>
+                ${enHum !== null && enHum >= 1 ? `<div class="pdu-prosp-hum">🌊 ≈ ${fmtN(Math.round(enHum))} ${unidad} sobre humedal <span>(${fmtN(R.fraccHumedal * 100, 1)}% del polígono)</span></div>` : ''}
+            </div>`;
+        };
+        if (v) piezas.push(tarjeta('Viviendas prospectadas', v, R.vivHumedal, 'viviendas'));
+        if (c) piezas.push(tarjeta('Cuartos turísticos prospectados', c, R.cuaHumedal, 'cuartos'));
+        if (v && v.valor && PDU_CONFIG.ocupantesPorVivienda) {
+            piezas.push(linea('Población potencial', `${fmtN(Math.floor(v.valor) * PDU_CONFIG.ocupantesPorVivienda)} hab.`, `${PDU_CONFIG.ocupantesPorVivienda} ocupantes por vivienda`));
+        }
+        piezas.push(`<p class="pdu-explica">La <strong>prospección</strong> es el techo normativo: resulta de multiplicar la densidad que el PDU asigna al polígono por su superficie. Indica cuántas unidades autoriza el instrumento si el suelo se ocupa por completo, no cuántas existen hoy. La porción sobre humedal es una estimación proporcional que supone una distribución homogénea de la densidad dentro del polígono.</p>`);
+        return seccion('🏘️ Viviendas prospectadas por el PDU', piezas);
+    }
+
     function renderResultado(f, R) {
         const p = f.properties;
         const c = colorDe(p);
@@ -590,12 +690,11 @@
                 <div class="pdu-cab-area">${fmtM2(A)}</div>
             </div>
             ${alertas}
-            ${seccion('🏗️ Lo que permite el PDU aquí', [
-                linea('Superficie de desplante (COS)', R.desplante ? fmtM2(R.desplante) : '—', R.cos ? `COS ${fmtN(R.cos * 100)}%` : ''),
-                linea('Superficie construible', R.construible ? fmtM2(R.construible) : '—', R.cus ? `CUS ${fmtN(R.cus, 2)}` : ''),
-                linea('Niveles', R.niveles !== null ? fmtN(R.niveles) : esc(p.Niveles || '—')),
-                R.viviendas ? linea('Viviendas máximas estimadas', R.viviendas.valor !== null ? fmtN(Math.floor(R.viviendas.valor)) : '—', esc(R.viviendas.texto)) : '',
-                R.cuartos ? linea('Cuartos máximos estimados', R.cuartos.valor !== null ? fmtN(Math.floor(R.cuartos.valor)) : '—', esc(R.cuartos.texto)) : ''
+            ${bloqueProspeccion(R, p)}
+            ${seccion('🏗️ Ocupación del suelo que autoriza el PDU', [
+                linea('Superficie de desplante (COS)', R.desplante ? fmtM2(R.desplante) : '—', R.cos ? `COS ${fmtN(R.cos * 100)}%: porción del terreno que puede cubrirse con construcción, es decir, sellarse y dejar de infiltrar lluvia` : ''),
+                linea('Superficie total construible', R.construible ? fmtM2(R.construible) : '—', R.cus ? `CUS ${fmtN(R.cus, 2)}: metros construidos permitidos por cada metro de terreno, sumando todos los niveles` : (R.construible ? 'Estimada como desplante × niveles' : '')),
+                linea('Niveles permitidos', R.niveles !== null ? fmtN(R.niveles) : esc(p.Niveles || '—'))
             ])}
             ${seccion('💧 Agua y humedales', [
                 humedal.length ? humedal.join('') : nada('Sin humedales ni zonas inundables mapeadas'),
@@ -637,8 +736,15 @@
         // Resumen en texto plano para informes
         if (R.alertas.length) { txt.push('', 'PUNTOS A REVISAR:'); R.alertas.forEach(a => txt.push(`- ${a}`)); }
         txt.push('', `Desplante permitido (COS): ${R.desplante ? fmtM2(R.desplante) : '—'}`);
-        if (R.viviendas && R.viviendas.valor) txt.push(`Viviendas máximas estimadas: ${fmtN(Math.floor(R.viviendas.valor))} (${R.viviendas.texto})`);
-        if (R.cuartos && R.cuartos.valor) txt.push(`Cuartos máximos estimados: ${fmtN(Math.floor(R.cuartos.valor))} (${R.cuartos.texto})`);
+        if (R.viviendas && R.viviendas.valor) {
+            txt.push(`Viviendas prospectadas por el PDU: ${fmtN(Math.floor(R.viviendas.valor))} (${R.viviendas.formula}; densidad asignada: ${R.viviendas.texto})`);
+            if (R.vivHumedal >= 1) txt.push(`  de ellas, sobre humedal (estimación proporcional): ${fmtN(Math.round(R.vivHumedal))}`);
+            if (PDU_CONFIG.ocupantesPorVivienda) txt.push(`  población potencial: ${fmtN(Math.floor(R.viviendas.valor) * PDU_CONFIG.ocupantesPorVivienda)} habitantes`);
+        }
+        if (R.cuartos && R.cuartos.valor) {
+            txt.push(`Cuartos turísticos prospectados: ${fmtN(Math.floor(R.cuartos.valor))} (${R.cuartos.formula})`);
+            if (R.cuaHumedal >= 1) txt.push(`  de ellos, sobre humedal (estimación proporcional): ${fmtN(Math.round(R.cuaHumedal))}`);
+        }
         Object.entries(R.humedales).forEach(([n, a]) => txt.push(`Humedal – ${n}: ${fmtM2(a)}`));
         R.cuerpos.forEach(x => txt.push(`IAHCSA – ${x.nombre}: ${x.n} (${fmtM2(x.a)})`));
         if (R.descargas.n) txt.push(`Descargas: ${R.descargas.n} (${formatVol(R.descargas.v)})`);
@@ -766,12 +872,48 @@
         .pdu-acciones button{flex:1;padding:9px;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:12px;background:#0f766e;color:#fff;}
         .pdu-acciones button+button{background:#e2e8f0;color:#1f2937;}
         .pdu-cargando{text-align:center;padding:30px 10px;color:#4b5563;}
+        .pdu-modo{margin-top:8px;}
+        .pdu-modo>span{display:block;margin-bottom:4px;}
+        .pdu-modo>div{display:flex;gap:4px;}
+        .pdu-modo button{flex:1;margin:0 !important;background:#e2e8f0 !important;color:#1f2937 !important;font-weight:600;}
+        .pdu-modo button.activo{background:#0f766e !important;color:#fff !important;}
+        .pdu-total{margin:4px 8px 8px 28px;padding:8px;background:#f0fdfa;border:1px solid #99f6e4;border-radius:6px;font-size:11px;color:#134e4a;}
+        .pdu-total button{margin-top:6px;width:100%;padding:6px;border:none;border-radius:4px;background:#0f766e;color:#fff;font-weight:600;cursor:pointer;font-size:11px;}
+        .pdu-prosp{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin:6px 0;}
+        .pdu-prosp-alerta{background:#fef2f2;border-color:#fecaca;}
+        .pdu-prosp-t{font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.4px;}
+        .pdu-prosp-n{font-size:24px;font-weight:800;color:#0f172a;line-height:1.2;}
+        .pdu-prosp-n small{font-size:12px;font-weight:600;color:#475569;}
+        .pdu-formula{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#334155;margin-top:2px;}
+        .pdu-prosp-hum{margin-top:6px;padding:6px 8px;background:#e0f2fe;border-radius:6px;color:#075985;font-weight:600;}
+        .pdu-prosp-hum span{font-weight:400;}
+        .pdu-explica{font-size:11px;color:#4b5563;line-height:1.5;margin:6px 0 0;}
+        .pdu-row .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle;}
+        .pdu-click{cursor:pointer;border-radius:4px;}
+        .pdu-click:hover{background:#f1f5f9;}
+        .pdu-progreso{height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden;margin:6px 0;}
+        .pdu-progreso div{height:100%;background:#0f766e;transition:width .2s;}
+        .pdu-map-ctl{display:flex;flex-direction:column;gap:6px;}
+        .pdu-map-ctl button{padding:8px 12px;border:none;border-radius:8px;background:#fff;color:#1f2937;font-weight:700;font-size:12px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3);text-align:left;white-space:nowrap;}
+        .pdu-map-ctl button:hover{background:#f1f5f9;}
+        .pdu-map-ctl button.activo{background:#0f766e;color:#fff;}
+        #pdu-map-gps.activo{background:#2563eb;}
+        .pdu-gps-icono span{display:block;width:22px;height:22px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 0 0 0 rgba(37,99,235,.6);animation:pduPulso 2s infinite;box-sizing:border-box;}
+        @keyframes pduPulso{0%{box-shadow:0 0 0 0 rgba(37,99,235,.6);}70%{box-shadow:0 0 0 16px rgba(37,99,235,0);}100%{box-shadow:0 0 0 0 rgba(37,99,235,0);}}
+        #pdu-gps-info{position:fixed;left:20px;bottom:120px;width:260px;background:#fff;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.25);padding:10px 12px;z-index:1400;font-family:'Segoe UI',sans-serif;font-size:12px;display:none;}
+        #pdu-gps-info.visible{display:block;}
+        #pdu-gps-info .t{font-weight:700;color:#1d4ed8;display:flex;justify-content:space-between;}
+        #pdu-gps-info .t span{font-weight:400;color:#6b7280;}
+        #pdu-gps-info .z{margin:6px 0;padding-left:8px;border-left:4px solid #cbd5e1;}
+        #pdu-gps-info button{width:100%;margin-top:6px;padding:7px;border:none;border-radius:6px;background:#0f766e;color:#fff;font-weight:600;cursor:pointer;font-size:12px;}
+        #pdu-gps-info button.sec{background:#e2e8f0;color:#1f2937;}
         @media (max-width:768px){
             #pdu-resultados{top:auto;bottom:0;right:0;left:0;width:auto;max-height:65vh;border-radius:14px 14px 0 0;}
             #pdu-resultados .pdu-top{border-radius:14px 14px 0 0;padding:12px 14px;}
             #pdu-resultados.minimizado .pdu-top{border-radius:14px 14px 0 0;}
             #pdu-resultados .pdu-top::before{content:'';position:absolute;top:5px;left:50%;transform:translateX(-50%);width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,.5);}
             #pdu-resultados .pdu-top{position:relative;}
+            #pdu-gps-info{left:10px;right:10px;width:auto;bottom:130px;}
         }`;
         const s = document.createElement('style');
         s.textContent = css;
@@ -783,7 +925,8 @@
 
         // Pane propio: por defecto encima de las demás capas para poder tocar los polígonos
         const pane = map.createPane('pduPane');
-        pane.style.zIndex = 450;
+        pane.style.zIndex = 350;
+        pane.style.pointerEvents = 'none';
 
         const panel = document.getElementById('control-panel');
         const bloque = document.createElement('div');
@@ -802,9 +945,19 @@
             <div class="pdu-ctrl">
                 Transparencia del relleno
                 <input type="range" id="pdu-opacidad" min="0" max="90" value="${Math.round(estado.opacidad * 100)}">
-                <button type="button" id="pdu-orden">⬇️ Enviar PDU debajo de las otras capas</button>
+                <div class="pdu-modo" role="group" aria-label="Qué responde al clic">
+                    <span>Al tocar el mapa consultar:</span>
+                    <div>
+                        <button type="button" data-modo="capas" class="activo">🗺️ Otras capas</button>
+                        <button type="button" data-modo="pdu">🏙️ PDU</button>
+                    </div>
+                </div>
             </div>
-            <p class="pdu-hint">Toca un polígono para ver la clasificación del municipio y usa «Calcular» para saber qué hay dentro.</p>`;
+            <div class="pdu-total">
+                <div>Viviendas prospectadas en todo el PDU: <strong id="pdu-total-viv">…</strong></div>
+                <button type="button" id="pdu-btn-resumen">📊 Ver resumen municipal</button>
+            </div>
+            <p class="pdu-hint">Activa «🏙️ PDU» y toca un polígono para ver la clasificación del municipio; con «Calcular» sabrás qué hay dentro. Regresa a «Otras capas» para consultar cenotes, pozos, proyectos y demás.</p>`;
         panel.appendChild(bloque);
 
         document.getElementById('layer-pdu').addEventListener('change', e => {
@@ -818,11 +971,12 @@
             if (estado.seleccion) seleccionar(estado.seleccion.feature.properties._k);
         });
 
-        document.getElementById('pdu-orden').addEventListener('click', e => {
-            const arriba = pane.style.zIndex === '450';
-            pane.style.zIndex = arriba ? 350 : 450;
-            e.target.textContent = arriba ? '⬆️ Traer PDU encima de las otras capas' : '⬇️ Enviar PDU debajo de las otras capas';
-        });
+        bloque.querySelectorAll('.pdu-modo button').forEach(b =>
+            b.addEventListener('click', () => setModo(b.dataset.modo === 'pdu')));
+        document.getElementById('pdu-btn-resumen').addEventListener('click', resumenMunicipal);
+        document.getElementById('layer-pdu').addEventListener('change', e => { if (!e.target.checked) setModo(false); });
+
+        construirControlesMapa();
 
         // Panel de resultados
         const res = document.createElement('div');
@@ -849,6 +1003,224 @@
             const el = document.getElementById(id);
             if (el) L.DomEvent.disableScrollPropagation(el);
         });
+    }
+
+    // ---------- MODO DE CLIC ----------
+    // El PDU se dibuja en un lienzo que cubre todo el mapa; si recibiera clics
+    // taparía las demás capas. Por eso sólo responde cuando el modo PDU está activo.
+    function setModo(pdu) {
+        estado.modoPDU = !!pdu;
+        const pane = map.getPane('pduPane');
+        if (pane) {
+            pane.style.zIndex = pdu ? 450 : 350;
+            pane.style.pointerEvents = pdu ? 'auto' : 'none';
+        }
+        if (pdu) {
+            const cb = document.getElementById('layer-pdu');
+            if (cb && !cb.checked) { cb.checked = true; if (estado.grupoPadre) map.addLayer(estado.grupoPadre); }
+        }
+        document.querySelectorAll('.pdu-modo button').forEach(b =>
+            b.classList.toggle('activo', (b.dataset.modo === 'pdu') === estado.modoPDU));
+        const bm = document.getElementById('pdu-map-modo');
+        if (bm) {
+            bm.classList.toggle('activo', estado.modoPDU);
+            bm.innerHTML = estado.modoPDU ? '🏙️ Consultando PDU' : '🏙️ Consultar PDU';
+            bm.title = estado.modoPDU ? 'Toca para volver a consultar las demás capas' : 'Toca para que el clic muestre la zonificación del PDU';
+        }
+        map.closePopup();
+    }
+
+    function construirControlesMapa() {
+        const Ctl = L.Control.extend({
+            options: { position: 'bottomleft' },
+            onAdd() {
+                const d = L.DomUtil.create('div', 'pdu-map-ctl');
+                d.innerHTML = `
+                    <button type="button" id="pdu-map-gps" title="Mostrar mi ubicación">📍 Mi ubicación</button>
+                    <button type="button" id="pdu-map-modo" title="Toca para que el clic muestre la zonificación del PDU">🏙️ Consultar PDU</button>`;
+                L.DomEvent.disableClickPropagation(d);
+                L.DomEvent.disableScrollPropagation(d);
+                return d;
+            }
+        });
+        map.addControl(new Ctl());
+        document.getElementById('pdu-map-modo').addEventListener('click', () => setModo(!estado.modoPDU));
+        document.getElementById('pdu-map-gps').addEventListener('click', activarGPS);
+
+        const toast = document.createElement('div');
+        toast.id = 'pdu-gps-info';
+        document.body.appendChild(toast);
+        L.DomEvent.disableClickPropagation(toast);
+    }
+
+    // ---------- GEOLOCALIZACIÓN ----------
+    function activarGPS() {
+        const g = estado.gps;
+        if (!navigator.geolocation) { alert('Tu navegador no permite geolocalización.'); return; }
+        if (g.watch !== null) {           // ya está siguiendo: sólo recentra
+            if (g.ultimo) map.setView(g.ultimo, Math.max(map.getZoom(), 16));
+            return;
+        }
+        const btn = document.getElementById('pdu-map-gps');
+        btn.textContent = '📡 Buscando…';
+        g.primera = true;
+        g.watch = navigator.geolocation.watchPosition(pos => {
+            const ll = L.latLng(pos.coords.latitude, pos.coords.longitude);
+            const acc = pos.coords.accuracy;
+            g.ultimo = ll;
+            if (!g.marker) {
+                g.marker = L.marker(ll, {
+                    icon: L.divIcon({ className: 'pdu-gps-icono', html: '<span></span>', iconSize: [22, 22], iconAnchor: [11, 11] }),
+                    interactive: false, keyboard: false, zIndexOffset: 1000
+                }).addTo(map);
+                g.circulo = L.circle(ll, { radius: acc, color: '#2563eb', weight: 1, fillColor: '#3b82f6', fillOpacity: 0.12, interactive: false }).addTo(map);
+            } else {
+                g.marker.setLatLng(ll);
+                g.circulo.setLatLng(ll).setRadius(acc);
+            }
+            btn.textContent = '📍 Centrar';
+            btn.classList.add('activo');
+            if (g.primera) { map.setView(ll, 17); g.primera = false; }
+            infoUbicacion(ll, acc);
+        }, err => {
+            const msg = {
+                1: 'Diste o tienes bloqueado el permiso de ubicación. Actívalo en la configuración del navegador para este sitio.',
+                2: 'No se pudo determinar tu ubicación. Revisa que el GPS o la ubicación del equipo estén activos.',
+                3: 'La ubicación tardó demasiado. Intenta de nuevo, de preferencia al aire libre.'
+            }[err.code] || err.message;
+            alert('📍 ' + msg);
+            detenerGPS();
+        }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+    }
+
+    function detenerGPS() {
+        const g = estado.gps;
+        if (g.watch !== null) navigator.geolocation.clearWatch(g.watch);
+        if (g.marker) map.removeLayer(g.marker);
+        if (g.circulo) map.removeLayer(g.circulo);
+        Object.assign(g, { watch: null, marker: null, circulo: null, ultimo: null, primera: true });
+        const btn = document.getElementById('pdu-map-gps');
+        if (btn) { btn.textContent = '📍 Mi ubicación'; btn.classList.remove('activo'); }
+        document.getElementById('pdu-gps-info').classList.remove('visible');
+    }
+
+    function pduEnPunto(ll) {
+        if (typeof turf === 'undefined') return null;
+        const pt = [ll.lng, ll.lat];
+        for (const f of estado.features) {
+            if (!f._bbox) f._bbox = turf.bbox(f);
+            const b = f._bbox;
+            if (pt[0] < b[0] || pt[0] > b[2] || pt[1] < b[1] || pt[1] > b[3]) continue;
+            try { if (turf.booleanPointInPolygon(pt, f)) return f; } catch (e) { }
+        }
+        return null;
+    }
+
+    function infoUbicacion(ll, acc) {
+        const f = pduEnPunto(ll);
+        const el = document.getElementById('pdu-gps-info');
+        const zona = f
+            ? `<div class="z" style="border-color:${colorDe(f.properties)}">Zona PDU: <strong>${esc(f.properties.tipo || 'Sin tipo')}</strong> ${esc(f.properties.CVE || '')}</div>
+               <button type="button" onclick="PDU.calcular(${f.properties._k})">🧮 ¿Qué hay en este polígono?</button>`
+            : `<div class="z">Fuera de los polígonos del PDU</div>`;
+        el.innerHTML = `
+            <div class="t">📍 Estás aquí <span>±${fmtN(acc)} m</span></div>
+            ${zona}
+            <button type="button" class="sec" onclick="PDU.detenerGPS()">Dejar de seguir mi ubicación</button>`;
+        el.classList.add('visible');
+    }
+
+    // ---------- RESUMEN MUNICIPAL ----------
+    function resumenMunicipal() {
+        const porTipo = {};
+        let tv = 0, tc = 0, lotes = 0;
+        estado.features.forEach(f => {
+            const t = f.properties.tipo || 'Sin tipo';
+            const r = porTipo[t] = porTipo[t] || { viv: 0, cua: 0, area: 0, n: 0, clave: f.properties.Clave, color: colorDe(f.properties) };
+            r.viv += f._viv; r.cua += f._cua; r.area += f._area; r.n++;
+            tv += f._viv; tc += f._cua; if (f._porLote) lotes++;
+        });
+        const filas = Object.entries(porTipo).filter(([, r]) => r.viv || r.cua).sort((a, b) => b[1].viv - a[1].viv)
+            .map(([t, r]) => `<div class="pdu-row"><span><i class="sw" style="background:${r.color}"></i>${esc(t)}</span><strong>${fmtN(r.viv)}</strong>
+                <em>${r.n} polígonos · ${fmtM2(r.area)}${r.cua ? ` · ${fmtN(r.cua)} cuartos` : ''}</em></div>`).join('');
+
+        const t = document.getElementById('pdu-top-titulo');
+        if (t) t.textContent = '📊 Resumen municipal del PDU';
+        abrirPanel(`
+            <div class="pdu-cab" style="border-color:#0f766e;">
+                <div class="pdu-cab-tipo" style="color:#0f766e;">Carga habitacional del PDU</div>
+                <div class="pdu-cab-area">${estado.features.length} polígonos analizados</div>
+            </div>
+            <div class="pdu-prosp">
+                <div class="pdu-prosp-t">Viviendas prospectadas en el municipio</div>
+                <div class="pdu-prosp-n">${fmtN(tv)} <small>viviendas</small></div>
+                ${tc ? `<div class="pdu-formula">${fmtN(tc)} cuartos turísticos adicionales</div>` : ''}
+                ${PDU_CONFIG.ocupantesPorVivienda ? `<div class="pdu-formula">≈ ${fmtN(tv * PDU_CONFIG.ocupantesPorVivienda)} habitantes potenciales</div>` : ''}
+            </div>
+            <p class="pdu-explica">Suma, polígono por polígono, de la densidad asignada multiplicada por la superficie. Es la capacidad máxima que el instrumento habilita, no la población actual.${lotes ? ` No incluye ${lotes} polígonos con densidad «por lote», que no se pueden totalizar sin el número de lotes.` : ''}</p>
+            <section class="pdu-sec"><h4>Por uso de suelo</h4>${filas || '<div class="pdu-nada">Ningún polígono tiene densidad asignada</div>'}</section>
+            <section class="pdu-sec" id="pdu-hum-mun">
+                <h4>🌊 ¿Cuántas caen sobre humedales?</h4>
+                <p class="pdu-explica">Cruza cada polígono con densidad asignada contra la capa de humedales y zonas inundables. Puede tardar un par de minutos.</p>
+                <div class="pdu-acciones"><button type="button" onclick="PDU.humedalesMunicipal()">Calcular viviendas sobre humedales</button></div>
+            </section>`);
+    }
+
+    async function humedalesMunicipal() {
+        await cargarTurf();
+        const cont = document.getElementById('pdu-hum-mun');
+        const objetivo = estado.features.filter(f => f._viv > 0 || f._cua > 0);
+        const humedales = poligonosDe('socioeco');
+        if (!humedales.length) { cont.innerHTML += '<p class="pdu-nota">La capa de humedales no está cargada.</p>'; return; }
+        const ctx = { errores: 0 };
+        let vivHum = 0, cuaHum = 0, areaHum = 0;
+        const top = [];
+        const porTipo = {};
+        for (let i = 0; i < objetivo.length; i++) {
+            const f = objetivo[i];
+            if (f._hum === undefined) {
+                const feature = turf.feature(f.geometry);
+                const obj = { feature, bbox: turf.bbox(feature) };
+                const ag = turf.area(feature);
+                let a = 0;
+                humedales.forEach(l => { a += areaTraslape(obj, l, ctx); });
+                f._hum = ag > 0 ? Math.min(1, a / ag) : 0;
+                f._humA = a;
+            }
+            const vh = f._viv * f._hum, ch = f._cua * f._hum;
+            vivHum += vh; cuaHum += ch; areaHum += f._humA;
+            if (vh >= 1 || ch >= 1) {
+                top.push({ f, vh, ch });
+                const t = f.properties.tipo || 'Sin tipo';
+                porTipo[t] = (porTipo[t] || 0) + vh;
+            }
+            if (i % 25 === 0) {
+                cont.innerHTML = `<h4>🌊 ¿Cuántas caen sobre humedales?</h4>
+                    <div class="pdu-progreso"><div style="width:${(100 * i / objetivo.length).toFixed(1)}%"></div></div>
+                    <p class="pdu-explica">Analizando ${i} de ${objetivo.length} polígonos…</p>`;
+                await sleep(0);
+            }
+        }
+        top.sort((a, b) => b.vh - a.vh);
+        const tv = estado.features.reduce((s, f) => s + f._viv, 0);
+        cont.innerHTML = `
+            <h4>🌊 Viviendas prospectadas sobre humedales</h4>
+            <div class="pdu-prosp pdu-prosp-alerta">
+                <div class="pdu-prosp-n">${fmtN(Math.round(vivHum))} <small>viviendas</small></div>
+                <div class="pdu-formula">${fmtN(100 * vivHum / (tv || 1), 1)}% de todas las viviendas que prospecta el PDU${cuaHum >= 1 ? ` · ${fmtN(Math.round(cuaHum))} cuartos turísticos` : ''}</div>
+                <div class="pdu-formula">${fmtM2(areaHum)} de humedal dentro de polígonos con densidad asignada</div>
+            </div>
+            <p class="pdu-explica">Estimación proporcional: en cada polígono, las viviendas prospectadas se multiplican por la fracción de su superficie que es humedal o zona inundable.</p>
+            ${Object.entries(porTipo).sort((a, b) => b[1] - a[1]).map(([t, v]) => linea(esc(t), fmtN(Math.round(v)))).join('')}
+            <h4 style="margin-top:10px;">Polígonos con más viviendas sobre humedal</h4>
+            ${top.slice(0, 10).map(x => `<div class="pdu-row pdu-click" onclick="PDU.zoom(${x.f.properties._k}); PDU.calcular(${x.f.properties._k});">
+                <span>${esc(x.f.properties.id || '')} · ${esc(x.f.properties.tipo || '')}</span><strong>${fmtN(Math.round(x.vh))}</strong>
+                <em>${esc(x.f.properties.CVE || '')} · ${fmtN(x.f._hum * 100, 1)}% humedal · toca para analizar</em></div>`).join('') || '<div class="pdu-nada">Ninguno</div>'}
+            ${ctx.errores ? `<p class="pdu-nota">${ctx.errores} geometrías con topología inválida quedaron fuera del conteo.</p>` : ''}`;
+        estado.ultimoResumen = `VIVIENDAS PROSPECTADAS POR EL PDU SOBRE HUMEDALES\nTotal prospectado en el municipio: ${fmtN(tv)} viviendas\nSobre humedales o zonas inundables (estimación proporcional): ${fmtN(Math.round(vivHum))} viviendas (${fmtN(100 * vivHum / (tv || 1), 1)}%)\n` +
+            Object.entries(porTipo).sort((a, b) => b[1] - a[1]).map(([t, v]) => `- ${t}: ${fmtN(Math.round(v))}`).join('\n') +
+            '\n\nFuente: Chac Mool de Toma las Aguas – cruce automático de capas.';
+        cont.innerHTML += `<div class="pdu-acciones"><button type="button" onclick="PDU.copiar()">📋 Copiar resumen</button></div>`;
     }
 
     function minimizar(forzar) {
@@ -923,11 +1295,13 @@
             await sleep(300);
         }
         construirUI();
+        // Clic en mapa para proyectos hidrosociales (definido en index.html como window.clickHidrosocial)
+        if (typeof window.clickHidrosocial === 'function') map.on('click', window.clickHidrosocial);
         cargarTurf().catch(e => console.warn('[PDU]', e.message));
         await cargarPDU();
     }
 
-    window.PDU = { calcular, cerrar, copiar, zoom, config: PDU_CONFIG };
+    window.PDU = { calcular, cerrar, copiar, zoom, detenerGPS, humedalesMunicipal, resumenMunicipal, config: PDU_CONFIG };
 
     if (document.readyState === 'complete') iniciar();
     else window.addEventListener('load', iniciar);
