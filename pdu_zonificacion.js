@@ -12,7 +12,7 @@
    ===================================================================== */
 (function () {
     'use strict';
-    const PDU_VERSION = '8 · sin detección automática de campos';
+    const PDU_VERSION = '9 · popup compacto';
     console.log('[PDU] Módulo cargado, versión ' + PDU_VERSION);
 
     // ---------------- CONFIGURACIÓN ----------------
@@ -628,8 +628,6 @@
         const excluir = ['_k', 'timstmp', 'begin', 'end', 'alttdMd', 'tessllt', 'extrude', 'visblty', 'drwOrdr', 'icon', 'snippet'];
         const todos = Object.entries(p).filter(([k, v]) => !excluir.includes(k) && !vacio(v))
             .map(([k, v]) => `<div><span style="color:#6b7280;">${esc(k)}:</span> ${esc(v)}</div>`).join('');
-        const extra = (estado.camposExtra || []).map(k =>
-            `<div><span style="color:#6b7280;">${esc(k)}:</span> ${vacio(p[k]) ? '—' : esc(p[k])}</div>`).join('');
 
         return `
         <div class="custom-popup">
@@ -657,10 +655,9 @@
                     ${fila('Dens. vivienda', p.Den_viv)}
                     ${fila('Dens. cuartos', p.Den_Cts)}
                 </table>
-                ${extra ? `<div style="margin-top:8px;padding:6px 8px;background:#fefce8;border:1px solid #fde68a;border-radius:6px;font-size:11px;line-height:1.5;">
-                    <div style="font-weight:700;color:#854d0e;margin-bottom:2px;">Campos agregados en QGIS</div>${extra}</div>` : ''}
+                
                 <details style="margin-top:8px;font-size:11px;">
-                    <summary style="cursor:pointer;color:#2563eb;">Ver todos los campos del municipio</summary>
+                    <summary style="cursor:pointer;color:#2563eb;">Ver todos los campos (municipio y QGIS)</summary>
                     <div style="margin-top:6px;line-height:1.5;">${todos}</div>
                 </details>
                 <button type="button" onclick="event.stopPropagation(); PDU.calcular(${p._k});"
