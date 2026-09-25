@@ -12,7 +12,7 @@
    ===================================================================== */
 (function () {
     'use strict';
-    const PDU_VERSION = '7 · superficies por fragmento';
+    const PDU_VERSION = '8 · sin detección automática de campos';
     console.log('[PDU] Módulo cargado, versión ' + PDU_VERSION);
 
     // ---------------- CONFIGURACIÓN ----------------
@@ -26,8 +26,8 @@
         ocupantesPorVivienda: null,
         // Opcional: huéspedes promedio por cuarto turístico. También se puede capturar en el panel.
         huespedesPorCuarto: null,
-        // Nombres de campos del geoproceso en QGIS. Si los dejas en null se detectan solos
-        // por el nombre (viv…, cuart…, pob/hab…, humed…). Escríbelos si la detección falla.
+        // Nombres EXACTOS de campos del geoproceso en QGIS. Mientras estén en null, el módulo
+        // calcula todo con densidad × superficie del fragmento y detecta humedal por cruce espacial.
         campos: {
             viviendas: null,   // viviendas estimadas en cada fragmento
             cuartos: null,     // cuartos estimados en cada fragmento
@@ -318,10 +318,10 @@
     // Detecta (una vez) los campos que agregó el geoproceso de QGIS
     function detectarCampos(props) {
         const claves = Object.keys(props);
-        const buscar = (conf, patron, excluir) => {
-            if (conf && claves.includes(conf)) return conf;
-            if (conf) { const k = claves.find(x => x.toLowerCase() === conf.toLowerCase()); if (k) return k; }
-            return claves.find(k => patron.test(k) && !(excluir && excluir.test(k))) || null;
+        // Sólo se usan campos declarados explícitamente en PDU_CONFIG.campos
+        const buscar = conf => {
+            if (!conf) return null;
+            return claves.find(x => x.toLowerCase() === String(conf).toLowerCase()) || null;
         };
         const c = PDU_CONFIG.campos;
         estado.camposDetectados = {
@@ -331,7 +331,12 @@
             humedal: buscar(c.humedal, /humed|wetland|inund/i),
             bloque: buscar(c.bloque, /padre|parent|orig|bloque|manzana/i)
         };
-        console.log('[PDU] Campos del geoproceso detectados:', estado.camposDetectados);
+        const municipales = ['id', 'name', 'timstmp', 'begin', 'end', 'alttdmd', 'tessllt', 'extrude', 'visblty', 'drwordr',
+            'icon', 'snippet', 'tipo', 'clave', 'cve', 'has', 'fid', 'area_m2', 'cos', 'cus', 'niveles', 'altura',
+            'rst_frn', 'rst_fnd', 'den_viv', 'den_cts', 'rest_lt', '_k', 'geom', 'geojson', 'geometry'];
+        estado.camposExtra = claves.filter(k => !municipales.includes(k.toLowerCase()));
+        console.log('[PDU] Campos en uso del geoproceso:', estado.camposDetectados);
+        console.log('[PDU] Campos adicionales en la tabla (no municipales):', estado.camposExtra.join(', ') || 'ninguno');
     }
 
     // Lee el valor numérico de un campo del geoproceso (null si no existe o no es número)
@@ -623,6 +628,8 @@
         const excluir = ['_k', 'timstmp', 'begin', 'end', 'alttdMd', 'tessllt', 'extrude', 'visblty', 'drwOrdr', 'icon', 'snippet'];
         const todos = Object.entries(p).filter(([k, v]) => !excluir.includes(k) && !vacio(v))
             .map(([k, v]) => `<div><span style="color:#6b7280;">${esc(k)}:</span> ${esc(v)}</div>`).join('');
+        const extra = (estado.camposExtra || []).map(k =>
+            `<div><span style="color:#6b7280;">${esc(k)}:</span> ${vacio(p[k]) ? '—' : esc(p[k])}</div>`).join('');
 
         return `
         <div class="custom-popup">
@@ -650,6 +657,8 @@
                     ${fila('Dens. vivienda', p.Den_viv)}
                     ${fila('Dens. cuartos', p.Den_Cts)}
                 </table>
+                ${extra ? `<div style="margin-top:8px;padding:6px 8px;background:#fefce8;border:1px solid #fde68a;border-radius:6px;font-size:11px;line-height:1.5;">
+                    <div style="font-weight:700;color:#854d0e;margin-bottom:2px;">Campos agregados en QGIS</div>${extra}</div>` : ''}
                 <details style="margin-top:8px;font-size:11px;">
                     <summary style="cursor:pointer;color:#2563eb;">Ver todos los campos del municipio</summary>
                     <div style="margin-top:6px;line-height:1.5;">${todos}</div>
