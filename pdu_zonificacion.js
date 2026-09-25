@@ -12,6 +12,8 @@
    ===================================================================== */
 (function () {
     'use strict';
+    const PDU_VERSION = '7 · superficies por fragmento';
+    console.log('[PDU] Módulo cargado, versión ' + PDU_VERSION);
 
     // ---------------- CONFIGURACIÓN ----------------
     const PDU_CONFIG = {
@@ -350,12 +352,28 @@
         return /^(no|0|false|f)$/i.test(String(v).trim()) ? 0 : 1;   // texto: nombre del humedal
     }
 
+    // Superficie REAL del fragmento, medida sobre su geometría.
+    // Los campos area_m2 y HAS conservan la superficie del polígono regular original
+    // (el geoproceso los copió a cada fragmento), así que NO sirven para el fragmento.
     function areaDe(f) {
+        try { if (typeof turf !== 'undefined') { const a = turf.area(f); if (a > 0) return a; } } catch (e) { }
+        return areaOriginal(f) || 0;
+    }
+
+    // Superficie del polígono regular original, tal como la registró el municipio
+    function areaOriginal(f) {
         const a = parseNum(f.properties.area_m2);
         if (a && a > 0) return a;
         const h = parseNum(f.properties.HAS);
-        if (h && h > 0) return h * 10000;
-        try { return typeof turf !== 'undefined' ? turf.area(f) : 0; } catch (e) { return 0; }
+        return h && h > 0 ? h * 10000 : null;
+    }
+
+    // Identificador del fragmento (la tabla puede nombrarlo id, fid, gid…)
+    function idDe(p) {
+        for (const k of ['id', 'ID', 'Id', 'fid', 'FID', 'gid', 'objectid', 'OBJECTID', 'id_1', 'ID_1']) {
+            if (!vacio(p[k])) return String(p[k]);
+        }
+        return `#${p._k}`;
     }
 
     // Viviendas y cuartos que asigna el PDU a cada polígono (para el resumen municipal)
@@ -364,6 +382,7 @@
         const v = parseDensidad(f.properties.Den_viv, area);
         const c = parseDensidad(f.properties.Den_Cts, area);
         f._area = area;
+        f._areaOrig = areaOriginal(f);
         // Valores SIN redondear: al sumar muchos fragmentos pequeños el redondeo acumula error
         const vivDens = v && v.valor ? v.valor : 0;
         const cuaDens = c && c.valor ? c.valor : 0;
@@ -400,7 +419,9 @@
     const claveBloque = f => {
         const kb = estado.camposDetectados.bloque;
         if (kb && !vacio(f.properties[kb])) return 'B:' + f.properties[kb];
-        return 'C:' + (f.properties.CVE || f.properties.Clave || f.properties.tipo || '');
+        const clave = f.properties.CVE || f.properties.Clave || f.properties.tipo || '';
+        const orig = !vacio(f.properties.area_m2) ? f.properties.area_m2 : (!vacio(f.properties.HAS) ? f.properties.HAS : '');
+        return 'C:' + clave + '|' + orig;
     };
 
     function vertices(f, max = 400) {
@@ -463,7 +484,12 @@
     function resumenBloque(f, ctx) {
         const miembros = bloqueDe(f);
         const humedales = poligonosDe('socioeco');
+        const dv = parseDensidad(f.properties.Den_viv, f._areaOrig || 0);
+        const dc = parseDensidad(f.properties.Den_Cts, f._areaOrig || 0);
         const B = { n: miembros.length, area: 0, viv: 0, cua: 0, vivT: 0, cuaT: 0, hab: 0, habOK: true,
+            areaOrig: f._areaOrig,
+            vivOrig: dv && dv.valor && !dv.transferible ? dv.valor : null,
+            cuaOrig: dc && dc.valor && !dc.transferible ? dc.valor : null,
             vivH: 0, cuaH: 0, habH: 0, areaH: 0, fragsHum: 0, frags: [] };
         miembros.forEach(g => {
             fraccionHumedal(g, ctx, humedales);
@@ -593,8 +619,7 @@
         const p = f.properties;
         const c = colorDe(p);
         const fila = (etq, v) => `<tr><td style="color:#6b7280;padding:3px 8px 3px 0;vertical-align:top;white-space:nowrap;">${etq}</td><td style="padding:3px 0;"><strong>${vacio(v) ? '—' : esc(v)}</strong></td></tr>`;
-        const sup = !vacio(p.HAS) ? `${esc(p.HAS)} ha` : '';
-        const m2 = !vacio(p.area_m2) ? `${esc(p.area_m2)} m²` : '';
+        const supOrig = f._areaOrig ? fmtM2(f._areaOrig) : '—';
         const excluir = ['_k', 'timstmp', 'begin', 'end', 'alttdMd', 'tessllt', 'extrude', 'visblty', 'drwOrdr', 'icon', 'snippet'];
         const todos = Object.entries(p).filter(([k, v]) => !excluir.includes(k) && !vacio(v))
             .map(([k, v]) => `<div><span style="color:#6b7280;">${esc(k)}:</span> ${esc(v)}</div>`).join('');
@@ -611,9 +636,10 @@
                     🏘️ En este fragmento: <strong>${fmtN(f._viv)}</strong> viviendas${f._cua ? ` · <strong>${fmtN(f._cua)}</strong> cuartos` : ''}${personas(f).hab !== null ? ` · <strong>${fmtN(personas(f).hab)}</strong> hab.` : ''}
                 </div>` : ''}
                 <table style="font-size:12px;border-collapse:collapse;width:100%;">
-                    ${fila('Identificador', p.id)}
+                    ${fila('Identificador', idDe(p))}
                     ${fila('Clave', p.Clave)}
-                    ${fila('Superficie', [sup, m2].filter(Boolean).join(' / '))}
+                    <tr><td style="color:#6b7280;padding:3px 8px 3px 0;vertical-align:top;white-space:nowrap;">Este fragmento</td><td style="padding:3px 0;"><strong>${fmtM2(f._area)}</strong></td></tr>
+                    <tr><td style="color:#6b7280;padding:3px 8px 3px 0;vertical-align:top;white-space:nowrap;">Polígono PDU original</td><td style="padding:3px 0;"><strong>${supOrig}</strong></td></tr>
                     ${fila('COS', p.COS)}
                     ${fila('CUS', p.CUS)}
                     ${fila('Niveles', p.Niveles)}
@@ -643,7 +669,7 @@
         const obj = { feature, bbox: turf.bbox(feature) };
         const ctx = { errores: 0 };
         const areaGeom = turf.area(feature);
-        const area = areaDe(f) || areaGeom;   // misma superficie que usa el resumen municipal
+        const area = areaGeom;   // superficie real del fragmento (no la del polígono original)
         const R = { area, areaGeom };
 
         const dentro = (lng, lat) =>
@@ -888,15 +914,28 @@
             B.vivT ? fila('Viviendas transferibles', fmtN(f._vivT), fmtN(B.vivT), '') : '',
             B.cuaT ? fila('Cuartos transferibles', fmtN(f._cuaT), fmtN(B.cuaT), '') : ''
         ].join('');
+        // Verificación: suma de fragmentos contra la superficie registrada del polígono original
+        let verif = '';
+        if (B.areaOrig) {
+            const cob = B.area / B.areaOrig;
+            verif = `<div class="pdu-verif">
+                <div><span>Polígono original (dato municipal)</span><strong>${fmtM2(B.areaOrig)}</strong></div>
+                ${B.vivOrig !== null ? `<div><span>Viviendas asignadas al polígono original</span><strong>${fmtN(B.vivOrig)}</strong></div>` : ''}
+                ${B.cuaOrig !== null ? `<div><span>Cuartos asignados al polígono original</span><strong>${fmtN(B.cuaOrig)}</strong></div>` : ''}
+                <div><span>Superficie cubierta por los ${B.n} fragmentos</span><strong>${fmtN(cob * 100, 1)}%</strong></div>
+                ${Math.abs(1 - cob) > 0.05 ? `<p class="pdu-explica">La suma de fragmentos no coincide con la superficie original (${fmtM2(B.area)} frente a ${fmtM2(B.areaOrig)}). Puede faltar algún fragmento, haber recortes por el límite municipal o traslapes en el geoproceso.</p>` : ''}
+            </div>`;
+        }
         partes.push(`
             <table class="pdu-tabla">
-                <thead><tr><th></th><th>Este fragmento</th><th>Polígono completo</th><th class="pc">%</th></tr></thead>
+                <thead><tr><th></th><th>Este fragmento</th><th>Suma de fragmentos</th><th class="pc">% del polígono</th></tr></thead>
                 <tbody>${filas}</tbody>
             </table>
             <div class="pdu-barra" title="Participación del fragmento en el polígono">
                 <div style="width:${B.viv ? Math.max(1, 100 * f._viv / B.viv) : (B.area ? Math.max(1, 100 * f._area / B.area) : 0)}%"></div>
             </div>
-            <p class="pdu-explica">Polígono regular del PDU con la clave <strong>${esc(p.CVE || p.Clave || '')}</strong>, reconstruido a partir de <strong>${B.n}</strong> fragmento${B.n === 1 ? '' : 's'} contiguo${B.n === 1 ? '' : 's'} (${B.fragsHum} en humedal). Su contorno aparece punteado en el mapa.</p>`);
+            <p class="pdu-explica">Polígono regular del PDU con la clave <strong>${esc(p.CVE || p.Clave || '')}</strong>, dividido en <strong>${B.n}</strong> fragmento${B.n === 1 ? '' : 's'} (${B.fragsHum} en humedal). Su contorno aparece punteado en el mapa.</p>
+            ${verif}`);
 
         // Reparto dentro y fuera de humedal
         if (B.viv || B.cua) {
@@ -919,7 +958,7 @@
             const lista = B.frags.slice(0, 12).map(g => {
                 const pg = personas(g);
                 return `<div class="pdu-row pdu-click ${g === f ? 'actual' : ''}" onclick="PDU.calcular(${g.properties._k})">
-                    <span>${g._hum >= 0.5 ? '🌊' : '▫️'} ${esc(g.properties.id || '')}</span><strong>${fmtN(g._viv || g._cua)}</strong>
+                    <span>${g._hum >= 0.5 ? '🌊' : '▫️'} ${esc(idDe(g.properties))}</span><strong>${fmtN(g._viv || g._cua)}</strong>
                     <em>${fmtM2(g._area)} · ${fmtN(g._hum * 100, 0)}% humedal${g._cua && g._viv ? ` · ${fmtN(g._cua)} cuartos` : ''}${pg.hab ? ` · ${fmtN(pg.hab)} hab.` : ''}${g === f ? ' · analizado' : ''}</em></div>`;
             }).join('');
             partes.push(`<details class="pdu-frags" ${B.n <= 12 ? 'open' : ''}>
@@ -936,7 +975,7 @@
         if (B.vivT || B.cuaT) {
             partes.push(`<p class="pdu-explica">Las densidades marcadas «para transferir» no se edifican en este sitio: son potencial de desarrollo que el PDU permite trasladar a otras zonas. Por eso se cuentan aparte y no suman a la carga local.</p>`);
         }
-        partes.push(`<p class="pdu-explica"><strong>Cómo se lee:</strong> el PDU asigna una sola densidad a todo el polígono regular. El geoproceso lo subdividió según los humedales identificados, y cada fragmento conserva esa densidad; por lo tanto, las unidades se reparten en proporción a la superficie de cada fragmento (densidad × superficie del fragmento). Las cifras son la <strong>prospección normativa</strong>: el máximo que el instrumento autoriza, no lo construido hoy.</p>`);
+        partes.push(`<p class="pdu-explica"><strong>Cómo se lee:</strong> el PDU asigna una sola densidad a todo el polígono regular. El geoproceso lo subdividió según los humedales identificados; cada fragmento conserva esa densidad, así que sus unidades se calculan con la <strong>superficie medida de su propia geometría</strong> (densidad × superficie del fragmento), no con la superficie del polígono original que viene en la tabla. Las cifras son la <strong>prospección normativa</strong>: el máximo que el instrumento autoriza, no lo construido hoy.</p>`);
 
         return seccion('🧩 Prospección del PDU: fragmento y polígono completo', partes);
     }
@@ -947,7 +986,7 @@
         const c = colorDe(p);
         const A = R.area;
         const txt = [];
-        txt.push(`ANÁLISIS DEL POLÍGONO PDU ${p.id || ''} (${p.tipo || ''}, ${p.CVE || p.Clave || ''})`);
+        txt.push(`ANÁLISIS DEL FRAGMENTO PDU ${idDe(p)} (${p.tipo || ''}, ${p.CVE || p.Clave || ''})`);
         txt.push(`Superficie: ${fmtM2(A)}`);
 
         const humedal = Object.entries(R.humedales).map(([n, a]) => linea(n, fmtM2(a), pct(a, A).replace(' · ', '')));
@@ -964,7 +1003,7 @@
         const html = `
             <div class="pdu-cab" style="border-color:${c};">
                 <div class="pdu-cab-tipo" style="color:${c};">${esc(p.tipo || 'Sin tipo')}</div>
-                <div class="pdu-cab-cve">${esc(p.CVE || p.Clave || '')} <span>${esc(p.id || '')}</span></div>
+                <div class="pdu-cab-cve">${esc(p.CVE || p.Clave || '')} <span>${esc(idDe(p))}</span></div>
                 <div class="pdu-cab-area">${fmtM2(A)}</div>
             </div>
             ${alertas}
@@ -1177,6 +1216,9 @@
         .pdu-frags summary{cursor:pointer;font-weight:700;font-size:11px;color:#0f766e;}
         .pdu-frags-enc{display:flex;justify-content:space-between;font-size:10px;color:#64748b;padding:4px 0 2px;border-bottom:1px solid #e2e8f0;}
         .pdu-row.actual{background:#ecfeff;}
+        .pdu-verif{background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:8px 10px;margin:6px 0;font-size:11px;}
+        .pdu-verif>div{display:flex;justify-content:space-between;gap:8px;padding:2px 0;}
+        .pdu-verif span{color:#475569;}
         .pdu-modo{margin-top:8px;}
         .pdu-modo>span{display:block;margin-bottom:4px;}
         .pdu-modo>div{display:flex;gap:4px;}
@@ -1266,7 +1308,8 @@
                 <div>Viviendas prospectadas en todo el PDU: <strong id="pdu-total-viv">…</strong></div>
                 <button type="button" id="pdu-btn-resumen">📊 Ver resumen municipal</button>
             </div>
-            <p class="pdu-hint">Activa «🏙️ PDU» y toca un polígono para ver la clasificación del municipio; con «Calcular» sabrás qué hay dentro. Regresa a «Otras capas» para consultar cenotes, pozos, proyectos y demás.</p>`;
+            <p class="pdu-hint">Activa «🏙️ PDU» y toca un polígono para ver la clasificación del municipio; con «Calcular» sabrás qué hay dentro. Regresa a «Otras capas» para consultar cenotes, pozos, proyectos y demás.</p>
+            <p class="pdu-hint" style="color:#94a3b8;">Módulo PDU, versión ${PDU_VERSION}</p>`;
         panel.appendChild(bloque);
 
         const cbPDU = document.getElementById('layer-pdu');
@@ -1573,7 +1616,7 @@
             ${Object.entries(porTipo).sort((a, b) => b[1] - a[1]).map(([t, v]) => linea(esc(t), fmtN(Math.round(v)))).join('')}
             <h4 style="margin-top:10px;">Polígonos con más viviendas sobre humedal</h4>
             ${top.slice(0, 10).map(x => `<div class="pdu-row pdu-click" onclick="PDU.zoom(${x.f.properties._k}); PDU.calcular(${x.f.properties._k});">
-                <span>${esc(x.f.properties.id || '')} · ${esc(x.f.properties.tipo || '')}</span><strong>${fmtN(Math.round(x.vh))}</strong>
+                <span>${esc(idDe(x.f.properties))} · ${esc(x.f.properties.tipo || '')}</span><strong>${fmtN(Math.round(x.vh))}</strong>
                 <em>${esc(x.f.properties.CVE || '')} · ${fmtN(x.f._hum * 100, 1)}% humedal · toca para analizar</em></div>`).join('') || '<div class="pdu-nada">Ninguno</div>'}
             ${ctx.errores ? `<p class="pdu-nota">${ctx.errores} geometrías con topología inválida quedaron fuera del conteo.</p>` : ''}`;
         estado.ultimoResumen = `VIVIENDAS PROSPECTADAS POR EL PDU SOBRE HUMEDALES\nTotal prospectado en el municipio: ${fmtN(tv)} viviendas\nSobre humedales o zonas inundables (estimación proporcional): ${fmtN(Math.round(vivHum))} viviendas (${fmtN(100 * vivHum / (tv || 1), 1)}%)\n` +
